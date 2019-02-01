@@ -2,3 +2,7 @@
 .Rhistory
 .RData
 .Ruserdata
+
+# Files where I test functions
+test.R
+test/

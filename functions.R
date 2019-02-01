@@ -1,3 +1,5 @@
+setwd("~/SREP LAB/qsar-app")
+
 # Packages =====
 
 if(!require("pacman")) { 
@@ -17,6 +19,22 @@ p_load(caret,
        randomForest, 
        tidyverse
 )
+
+# Variables =====
+
+# Alpha-CD
+
+alpha.fill <- readRDS("./qsar/alpha/fill.RDS")
+alpha.models <- readRDS("./qsar/alpha/models.RDS")
+alpha.pp <- readRDS("./qsar/alpha/pp.settings.RDS")
+alpha.vars <- readRDS("./qsar/alpha/vars.RDS")
+
+# Beta-CD
+
+beta.fill <- readRDS("./qsar/beta/fill.RDS")
+beta.models <- readRDS("./qsar/beta/models.RDS")
+beta.pp <- readRDS("./qsar/beta/pp.settings.RDS")
+beta.vars <- readRDS("./qsar/beta/vars.RDS")
 
 # Pre-processing =====
 
@@ -52,8 +70,6 @@ pp.desc <- function(df, vars, pp.settings, fill.df) {
   # Storing away the names for later
   guests <- df[ , 1]
   desc <- df %>% dplyr::select(., vars)
-  
-  print(head(desc))
   
   # Replace Inf values w/ NAs to be filled in
   desc <- do.call(data.frame, 
@@ -107,9 +123,9 @@ ensemble <- function(df, models) {
 
 # Finds standard deviation for a single descriptor
 # Requires a vector or single column; returns num
-find.sd.desc <- function(data) {
-  sd <- (data[!is.na(data)] - mean(data, na.rm = T)) ^ 2 %>% sum()
-  sd <- sqrt(sd / (length(data) - 1))
+find.sd.desc <- function(desc) {
+  sd <- (desc[!is.na(desc)] - mean(desc, na.rm = T)) ^ 2 %>% sum()
+  sd <- sqrt(sd / (length(desc) - 1))
   return(sd)
 }
 
@@ -123,20 +139,23 @@ domain.num <- function(df) {
   # Checking if first column is "guest
   if (class(df[, 1]) != "numeric") {
     guest <- df[, 1]
-    df <- sapply(df[, -1], abs)
-    if(nrow(df) == 1)
-      result <- mean(
-        as.numeric(data[1, ], na.rm = T) + 1.28 * find.sd.desc(as.numeric(df[1, ])))
+    df <- abs(df[ , -1])
+    
+    # Checking to see if single entry or multiple entries
+    if(nrow(df) < 2) 
+      result <- (df[ 1, ] +  1.28 * find.sd.desc(as.numeric(df[ 1, ]))) %>% 
+        as.numeric() %>% mean()
     else
       result <-
-      apply(df, 1, function(x)
-        mean(as.numeric(x), na.rm = T) + 1.28 * find.sd.desc(as.numeric(x))) %>%
-      as.data.frame()
+        apply(df, 1, function(x)
+          mean(as.numeric(x), na.rm = T) + 1.28 * find.sd.desc(as.numeric(x))) %>%
+        as.data.frame()
+
     result <- data.frame(guest, result) %>%
       mutate(guest = as.character(guest))
     colnames(result)[2] <- "newSk"
   } else {
-    df <- sapply(df[ , -1], abs)
+    df <- sapply(df, abs)
     result <- apply(df, 1, function(x)
       mean(as.numeric(x), na.rm = T) + 1.28 * find.sd.desc(as.numeric(x))) %>%
       as.data.frame()
