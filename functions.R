@@ -17,7 +17,10 @@ p_load(caret,
        kernlab, 
        # pls, 
        randomForest, 
-       tidyverse
+       RCurl, 
+       stringr,
+       tidyverse, 
+       XML
 )
 
 # Variables =====
@@ -168,4 +171,57 @@ domain.num <- function(df) {
            mutate(domain = ifelse(result$max.ski < 3, "inside", 
                                   ifelse(result$min.ski > 3, "outside", 
                                          ifelse(result$newSk > 3, "outside", "inside")))))
+}
+
+
+# Cactus ====
+
+    # Read SDFs -----
+
+# Slightly different from the 03.cactus.functions.R file
+# instad of downloading to the local drive, attempting to read everything as a table
+
+download.cactus.results <- function(guest, chemical.format = "sdf") {
+  report <- tryCatch({ 
+    # destfile       <- paste0(path, "/", guest, ".SDF")
+    # Chemical format must be parsed to match all the outputs from NCI cactus
+    guest.url      <- URLencode(guest, reserved = T)
+    URL            <-
+      paste0("https://cactus.nci.nih.gov/chemical/structure/",
+             guest.url,
+             "/",
+             chemical.format)
+    sd.file <- readLines(URL) %>% data.frame() %>% sapply(as.character)
+    # Renaming the SDF to be consistent with the guest name
+    sd.file[1, 1] <- guest
+  },
+  warning = function(warn) {
+    message("Warning occurred: URL does not exist - check for typos or try alternate name.")
+    Guest.URL      <- unlist(lapply(guest, URLencode, reserved = T))
+    URL            <- paste0(
+      "https://cactus.nci.nih.gov/chemical/structure/",
+      Guest.URL, "/", chemical.format
+    )
+    sd.file <- readLines(URL) %>% data.frame() %>% sapply(as.character)
+    # Renaming the SDF to be consistent with the guest name
+    sd.file[1, 1] <- guest
+  },
+  error = function(err) {
+    message("An error occurred - the structure file could not be found")
+    sd.file <- data.frame()
+    
+  },
+  finally = {
+    message(guest, " processed")
+  })
+  return(sd.file)
+}
+
+# 
+check.download <- function(sdf, guests) {
+  
+}
+
+write.sdf <- function() {
+  
 }
