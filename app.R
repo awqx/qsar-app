@@ -1,10 +1,8 @@
 # install.packages("ggvis")
 library(shiny)
-library(ggvis)
-library(data.table)
-library(shinythemes)
 
 source("./functions.R")
+p_load(data.table, shiny, shinythemes)
 
 # Define UI for application that draws a histogram
 ui <- fluidPage(
@@ -42,7 +40,9 @@ ui <- fluidPage(
                       min = -50, max = 50, value = c(-30, 10)),
           # "Gamma" = "c" not available yet
           br(), 
-          uiOutput("xaxisRange")
+          uiOutput("xaxisRange"), 
+          br(),
+          downloadButton('downloadPred', 'Download Results')
          ),
          column(
            6,
@@ -70,7 +70,15 @@ ui <- fluidPage(
                   DT::dataTableOutput("SDFTable")
                 )
               )), 
-     tabPanel("Explore")
+     tabPanel("Explore", 
+              fluidRow(
+                column(
+                  2, offset = 2, 
+                  textInput("search", 
+                            label = h5("Guest Name")), 
+                  actionButton("searchExplore", "Search")
+                )
+              ))
    )
 )
 
@@ -185,6 +193,29 @@ server <- function(input, output) {
              `Applicability` = domain) %>%
       select(., -newSk)
   })
+  
+  output$downloadPred <- downloadHandler(
+    
+    # This function returns a string which tells the client
+    # browser what name to use when saving the file.
+    filename = function() {
+      paste("results", ".xls", sep = "")
+    },
+    
+    # This function should write data to a file given to it by
+    # the argument 'file'.
+    content = function(file) {
+      
+      # Write to a file specified by the 'file' argument
+      write.xlsx(pred() %>% 
+                   full_join(., choose.x(), by = "guest") %>%
+                   rename(Guest = guest, `Binding, kJ/mol` = ensemble, 
+                          `Applicability` = domain), 
+                 file, 
+                 col.names = T,
+                 row.names = F)
+    }
+  )
   
   SDFile <- eventReactive(
     input$searchButton, {

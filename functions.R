@@ -175,13 +175,14 @@ domain.num <- function(df) {
 
 
 # Cactus ====
+    # Formatting -----
 
     # Read SDFs -----
 
 # Slightly different from the 03.cactus.functions.R file
 # instad of downloading to the local drive, attempting to read everything as a table
 
-download.cactus.results <- function(guest, chemical.format = "sdf") {
+download.cactus.results <- function(guest) {
   report <- tryCatch({ 
     # destfile       <- paste0(path, "/", guest, ".SDF")
     # Chemical format must be parsed to match all the outputs from NCI cactus
@@ -189,22 +190,21 @@ download.cactus.results <- function(guest, chemical.format = "sdf") {
     URL            <-
       paste0("https://cactus.nci.nih.gov/chemical/structure/",
              guest.url,
-             "/",
-             chemical.format)
+             "/file?format=sdf")
     sd.file <- readLines(URL) %>% data.frame() %>% sapply(as.character)
     # Renaming the SDF to be consistent with the guest name
-    sd.file[1, 1] <- guest
+    sd.file[1, 1] <- str_trim(guest)
   },
   warning = function(warn) {
     message("Warning occurred: URL does not exist - check for typos or try alternate name.")
     Guest.URL      <- unlist(lapply(guest, URLencode, reserved = T))
     URL            <- paste0(
       "https://cactus.nci.nih.gov/chemical/structure/",
-      Guest.URL, "/", chemical.format
+      Guest.URL, "/file?format=sdf"
     )
     sd.file <- readLines(URL) %>% data.frame() %>% sapply(as.character)
     # Renaming the SDF to be consistent with the guest name
-    sd.file[1, 1] <- guest
+    sd.file[1, 1] <- str_trim(guest)
   },
   error = function(err) {
     message("An error occurred - the structure file could not be found")
