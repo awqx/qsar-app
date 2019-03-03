@@ -6,13 +6,102 @@ p_load(data.table, shiny, shinythemes)
 
 # Define UI for application that draws a histogram
 ui <- fluidPage(
-   theme = shinytheme("yeti"),
+   theme = shinytheme("sandstone"),
    # Application title
    # titlePanel("Cyclodextrin Affinity Prediction"),
    
    navbarPage(
      theme = "yeti", 
      "Cyclodextrin Affinity Predictions", 
+     tabPanel(
+       "Instructions",
+       column(
+         6, offset = 3, 
+         h3("Overview"),
+         p("You can use this web app to download SDFs of various molecules then 
+         run QSARS to predict their affinity to cyclodextrin. The code for the 
+         development of the models can be found ", 
+         a(href = "https://www.github.com/awqx/wip-cactus", "on GitHub. "),
+         "The QSARs are calculated off of molecular descriptors from 
+         PaDEL-Descriptor, which can be downloaded ", 
+         a(href = "https://www.yapcwsoft.com/dd/padeldescriptor/", 
+           "here, from Yap Chun Wei.")),
+         br(), 
+         "Using the app should work like this:",
+         tags$ol(
+           tags$li("Download: Obtain structure file(s) for molecules"), 
+           tags$li("Calculate Descriptors: Run the structure file(s) through 
+                   PaDEL-Descriptor"),
+           tags$li("Upload: Calculate affinity from the descriptors with QSARs")
+         ),
+         br(),
+         p("The Explore tab can be used to find molecules that fit specific 
+         parameters (e.g., analgesic, anti-cancer, antibiotic, FDA-approved). 
+         It is currently under construction."), 
+         h3("Downloading Structure Files"), 
+         p("The search box on the download page goes through ", 
+           a(href = "https://cactus.nci.nih.gov/chemical/structure", 
+             "the Chemical Identifier Resolver "), 
+           "provided by the CADD group of NCI to find SDFs (structure data 
+           files). You can download molecules one-by-one or a few at a time. 
+           For the latter, separate the names with commas. For example, type 
+           \"acetaminophen, ibuprofen, histamine\"." ), 
+         p("After hitting \"Search\", a table will appear on the right indicating
+           if the molecule's SDF could be located. If a molecule is not found, first 
+           check for typos. Alternatively, chemical synonyms may work (e.g., 
+           acetylsalicyclic acid instead of aspiring). Uncommon molecules or 
+           newly developed pharmaceuticals may be absent from the database, and 
+           will have to be hand-drawn or found elsewhere."),
+         h3("Using PaDEL-Descriptor"), 
+         p("Make sure that ", 
+           a(href = "https://www.yapcwsoft.com/dd/padeldescriptor/",
+             "PaDEL-Descriptor "), "and ",
+           a(href = "https://www.java.com/en/download/help/index_installing.xml",
+             "Java "), "are installed. Open the executable .jar file and check 
+           off the boxes to match the interface below.", 
+           br(),
+           img(src = "interface.PNG", width = "600px"),
+           br(),
+           "These are the changes that need to be made:", 
+           tags$ul(
+             tags$li("Check off \"3D\""), 
+             tags$li("Check off \"Retain 3D coordinates\""),
+             tags$li("Change \"Convert to 3D\" to \"Yes (use MM2 forcefield)\""),
+             tags$li("Under the tab \"Fingerprints\", 
+                     check off \"SubstructureFingerprinterCount\" (not shown in 
+                     image above)")
+           ),
+           "These are optional changes:", 
+           tags$ul(
+             tags$li("Set \"Max. running timer per molecule\" to 200,000 (this may 
+                     prevent PaDEL from getting stuck on certain molecules)"), 
+             tags$li("Check off \"Use filename as molecule name\" (this may be 
+                     convenient if every molecule is saved individually)")
+           ),
+           p("Set \"Molecules directory/file\" to the desired SDF. PaDEL-Descriptor 
+             can handle multiple molecules in one file, which using \"Download\"
+             in the app will produce. Also, with \"Descriptor output file\", save 
+             the file as a .csv.")
+           ),
+         h3("Obtaining Predictions"), 
+         p("Upload the .csv from PaDEL-Descriptor and select the cyclodextrin type 
+           that you want to model. As of now, only alpha- and beta-cyclodextrin 
+           are available. The app will then generate a table and a plot. The table
+           contains information about the applicability (if the molecule is inside 
+           the applicability domain, it's similar enough to the molecules the model 
+           was trained on to be predicted reliably), the binding affinity, and the
+           cyclodextrin being modeled."),
+         p("The last column will display the x-axis variable chosen by the user. 
+           This variable will be used to generate the graph on the next tab. 
+           If you select \"Applicability\", the x-variable on the plot will be 
+           \"newSk\", which is a metric used to determine similarity of data. 
+           A newSk < 3 would be considered inside the applicability domain."),
+         p("The table can be downloaded with \"Download Results\" and will be 
+           saved as a .csv."),
+         h3("Exploring Candidates"), 
+         p(em("Coming soon!"))
+       )
+     ),
      tabPanel(
        "Upload", 
        fluidRow(
@@ -58,6 +147,7 @@ ui <- fluidPage(
                   2, offset = 2, 
                   textInput("search", 
                             label = h5("Chemical Identifier Resolver")),
+                  h6("Add multiple chemical names by separating names with a comma"),
                   actionButton("searchButton", "Search"),
                   br(), 
                   br(),
@@ -219,12 +309,20 @@ server <- function(input, output) {
   
   SDFile <- eventReactive(
     input$searchButton, {
-      download.cactus.results(input$search)
+      download.cactus.multiple(input$search)
     }, ignoreNULL = T
   )
   
   output$SDFTable <- DT::renderDataTable({
-    SDFile()
+    if(is.null(SDFile()))
+      return(NULL)
+    check.found <- isolate(check.sdf(SDFile(), input$search)) 
+    # row names are molecule names due to check.sdf
+    results <- data.frame(ifelse(check.found, "Found", "Not found"))
+    colnames(results) <- "Search Status"
+    # Aesthetic decision to change molecule names to title case
+    rownames(results) <- toTitleCase(rownames(results))
+    return(results)
   })
   
   output$downloadData <- downloadHandler(
@@ -232,7 +330,10 @@ server <- function(input, output) {
     # This function returns a string which tells the client
     # browser what name to use when saving the file.
     filename = function() {
-      paste(input$search, ".SDF", sep = "")
+      if(str_detect(input$search, ","))
+        return("molecules.SDF")
+      else
+        return(paste(input$search, ".SDF", sep = ""))
     },
     
     # This function should write data to a file given to it by

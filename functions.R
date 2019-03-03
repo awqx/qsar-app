@@ -9,6 +9,7 @@ if(!require("pacman")) {
   library(pacman)
 
 p_load(caret,
+       ChemmineR,
        Cubist,
        e1071, 
        earth,
@@ -20,6 +21,7 @@ p_load(caret,
        RCurl, 
        stringr,
        tidyverse, 
+       tools,
        XML
 )
 
@@ -182,11 +184,13 @@ domain.num <- function(df) {
 # Slightly different from the 03.cactus.functions.R file
 # instad of downloading to the local drive, attempting to read everything as a table
 
-download.cactus.results <- function(guest) {
-  report <- tryCatch({ 
+# Starting with a function to gather the SDFs
+
+download.cactus <- function(guest) {
+  guest.url      <- URLencode(guest, reserved = T)
+  tryCatch({ 
     # destfile       <- paste0(path, "/", guest, ".SDF")
     # Chemical format must be parsed to match all the outputs from NCI cactus
-    guest.url      <- URLencode(guest, reserved = T)
     URL            <-
       paste0("https://cactus.nci.nih.gov/chemical/structure/",
              guest.url,
@@ -194,31 +198,70 @@ download.cactus.results <- function(guest) {
     sd.file <- readLines(URL) %>% data.frame() %>% sapply(as.character)
     # Renaming the SDF to be consistent with the guest name
     sd.file[1, 1] <- str_trim(guest)
+    return(sd.file)
   },
   warning = function(warn) {
-    message("Warning occurred: URL does not exist - check for typos or try alternate name.")
-    Guest.URL      <- unlist(lapply(guest, URLencode, reserved = T))
-    URL            <- paste0(
-      "https://cactus.nci.nih.gov/chemical/structure/",
-      Guest.URL, "/file?format=sdf"
-    )
-    sd.file <- readLines(URL) %>% data.frame() %>% sapply(as.character)
-    # Renaming the SDF to be consistent with the guest name
-    sd.file[1, 1] <- str_trim(guest)
+    message(paste0("Warning: URL does not exist - check for typos or try alternate name for ", guest))
+    # URL            <- paste0(
+    #   "https://cactus.nci.nih.gov/chemical/structure/",
+    #   guest.url, "/file?format=sdf"
+    # )
+    # sd.file <- readLines(URL) %>% data.frame() %>% sapply(as.character)
+    # # Renaming the SDF to be consistent with the guest name
+    # sd.file[1, 1] <- str_trim(guest)
+    return(data.frame())
   },
   error = function(err) {
-    message("An error occurred - the structure file could not be found")
-    sd.file <- data.frame()
-    
+    message(paste0("An error occurred - the structure file for ", guest, " could not be found"))
+    return(data.frame())
   },
   finally = {
     message(guest, " processed")
   })
-  return(sd.file)
+  # return(sd.file)
 }
 
-# 
-check.download <- function(sdf, guests) {
+
+# And a version that can handle multiple guests
+# Assuming that the guests are in a string separated by commas
+
+download.cactus.multiple <- function(guest) {
+  
+  guest <- strsplit(guest, ",") %>% lapply(str_trim) %>% unlist()
+  sdf <- do.call(rbind,
+                 lapply(guest,
+                        download.cactus))
+  return(data.frame(sdf))
+  
+}
+
+# Find the name of a guest in the SDF
+# Returns a boolean - T if detected
+# Currently unused due to being cannibalized by check.sdf
+
+find.guest <- function(sdf, guest) {
+  
+  check <- sdf %>% str_detect(guest) %>% sum()
+  return(check > 0)
+  
+}
+
+# Checks to see if all guests are present in the SDF by using the names
+# Returns a boolean vector corresponding to each guest
+
+check.sdf <- function(sdf, guest) {
+  
+  sdf <- sdf[ , 1] %>% as.character()
+  guest <- strsplit(guest, ",") %>% lapply(str_trim) %>% unlist()
+  check <- lapply(guest, str_detect, string = sdf) %>% lapply(sum)
+  
+  # Return a boolean
+  results <- check > 0
+  names(results) <- guest 
+  return(results)
+  # # Return a dataframe
+  # results <- ifelse(check > 0, "Found", "Not found")
+  # return(data.frame(guest, results))
   
 }
 
