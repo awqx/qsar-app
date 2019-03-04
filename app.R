@@ -4,6 +4,7 @@ library(shiny)
 source("./functions.R")
 p_load(data.table, shiny, shinythemes)
 
+# UI =====
 # Define UI for application that draws a histogram
 ui <- fluidPage(
    theme = shinytheme("sandstone"),
@@ -13,6 +14,7 @@ ui <- fluidPage(
    navbarPage(
      theme = "yeti", 
      "Cyclodextrin Affinity Predictions", 
+     # Instructions -----
      tabPanel(
        "Instructions",
        column(
@@ -102,6 +104,36 @@ ui <- fluidPage(
          p(em("Coming soon!"))
        )
      ),
+     # Download from CIR ----
+     tabPanel("Download", 
+              fluidRow(
+                column(
+                  2, offset = 2, 
+                  textInput("search", 
+                            label = h5("Chemical Identifier Resolver")),
+                  h6("Add multiple chemical names by separating names with a comma"),
+                  actionButton("searchButton", "Search"),
+                  br(), 
+                  br(),
+                  downloadButton('downloadData', 'Download')
+                  
+                ), 
+                column(
+                  6, 
+                  tabsetPanel(
+                    tabPanel(
+                      "Results", 
+                      DT::dataTableOutput("SDFTable")
+                    ),
+                    tabPanel(
+                      "Molecules", 
+                      plotOutput("molecules")
+                    )
+                  ),
+                  uiOutput("filePreview")
+                )
+              )), 
+     # Upload and run QSAR ----
      tabPanel(
        "Upload", 
        fluidRow(
@@ -141,25 +173,8 @@ ui <- fluidPage(
            )
          )
       )),
-     tabPanel("Download", 
-              fluidRow(
-                column(
-                  2, offset = 2, 
-                  textInput("search", 
-                            label = h5("Chemical Identifier Resolver")),
-                  h6("Add multiple chemical names by separating names with a comma"),
-                  actionButton("searchButton", "Search"),
-                  br(), 
-                  br(),
-                  downloadButton('downloadData', 'Download')
-                  
-                ), 
-                column(
-                  6, 
-                  uiOutput("filePreview"), 
-                  DT::dataTableOutput("SDFTable")
-                )
-              )), 
+     
+     # Explore predictions ----
      tabPanel("Explore", 
               fluidRow(
                 column(
@@ -172,9 +187,11 @@ ui <- fluidPage(
    )
 )
 
+# Server =====
 # Define server logic required to draw a histogram
 server <- function(input, output) {
   
+  # QSAR ----
   # A slider for adjusting the x-axis depending on the variable
   output$xaxisRange <- renderUI({
     if(is.null(pred()))
@@ -307,24 +324,36 @@ server <- function(input, output) {
     }
   )
   
+  # SDF/CIR ----
+  
+  # An SDF in the form of a data.frame
   SDFile <- eventReactive(
     input$searchButton, {
       download.cactus.multiple(input$search)
     }, ignoreNULL = T
   )
   
+  # Showing the results of downloading
   output$SDFTable <- DT::renderDataTable({
     if(is.null(SDFile()))
       return(NULL)
     check.found <- isolate(check.sdf(SDFile(), input$search)) 
-    # row names are molecule names due to check.sdf
-    results <- data.frame(ifelse(check.found, "Found", "Not found"))
-    colnames(results) <- "Search Status"
-    # Aesthetic decision to change molecule names to title case
-    rownames(results) <- toTitleCase(rownames(results))
+    # Finding names of guests
+    guest.names <- 
+      strsplit(input$search, ",") %>% 
+      lapply(str_trim) %>% unlist() %>% 
+      toTitleCase()
+    # Creating a data frame
+    results <- data.frame(guest.names, 
+                          ifelse(check.found, "Found", "Not found"), 
+                          row.names = NULL)
+    colnames(results) <- c("Molecule", "Search Status")
     return(results)
   })
   
+  # Enabling the user to download the SDF
+  # Running from the RStudio browser misnames the file, but running in the 
+  # default browser works
   output$downloadData <- downloadHandler(
     
     # This function returns a string which tells the client
@@ -348,57 +377,33 @@ server <- function(input, output) {
     }
   )
   
-  # GGVIS
-  # guest.pointer <- function(x) {
-  #   if(is.null(x))
-  #     return(NULL)
-  #   if(is.null(x$guest))
-  #     return(NULL)
-  #   
-  #   # pick out the guest
-  #   pred.df <- isolate(pred())
-  #   the.guest <- pred.df[pred.df$guest == x$guest, ]
-  #   
-  #   paste0(the.guest$guest, "<br>", 
-  #          the.guest$CD, "-CD complex<br>",
-  #          the.guest$ensemble, " kJ/mol<br>",
-  #          the.guest$domain, " the domain<br>")
-  # }
-#   vis <- reactive({
-#     # if(is.null(pred()))
-#     #   data.frame(x = 0, y = 0) %>% ggvis(~x, ~y)
-#     # Naming the x-axis
-#     if(input$xaxis == "ad")
-#       xaxis <- "newSk"
-#     else
-#       xaxis <- input$xaxis
-# 
-#     # Assigning the variables - requires some finessing because the inputs
-#     # are characters (see: the movie explorer example in the Shiny gallery)
-#     xvar <- prop("x", as.symbol(xaxis))
-#     yvar <- prop("y", as.symbol("ensemble"))
-#     
-#     pred() %>%
-#       ggvis(x = xvar, y = yvar) %>%
-#       layer_points(size := 25, size.hover:= 100, 
-#                    fillOpacity := 0.5, fillOpacity.hover := 1, 
-#                    stroke = ~CD, key := ~guest) %>%
-#       add_tooltip(guest.pointer, "hover") %>%
-#       add_axis("x", title = xvar) %>%
-#       add_axis("y", title = yvar) %>%
-#       add_legend("stroke", title = "Cyclodextrin", values = c("Alpha", "Beta")) %>%
-#       scale_nominal("stroke", domain = c("Alpha", "Beta"),
-#                     range = c("red", "blue")) %>%
-#       set_options(width = 500, height = 500)
-#     
-#   })
-# if(!is.null(observe({pred()})))
-#   vis %>% bind_shiny("plot2")
-  
+  # Plotting molecules from the SDF using ChemmineR
+  output$molecules <- renderPlot({
+    if(is.null(SDFile()))
+      return()
+    guest.sdf <- isolate(
+      SDFile() %>%
+        unlist() %>% as.character() %>% 
+        read.SDFstr() %>% read.SDFset()
+      ) 
+    guest.name <- isolate({
+      all.guests <- strsplit(input$search, ",") %>% 
+        lapply(str_trim) %>% unlist() %>% toTitleCase()
+      check.guests <- isolate(check.sdf(SDFile(), input$search)) 
+      all.guests[check.guests]
+    }
+      
+    )
+    plot(guest.sdf,
+         # griddim = c(2, 2), # I would like for plots to be separated
+         print_cid = guest.name,
+         print = F)
+  }
+  )
 
-  
 }
 
+# Run =====
 # Run the application 
 shinyApp(ui = ui, server = server)
 
