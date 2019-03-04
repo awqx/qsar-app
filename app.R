@@ -19,6 +19,7 @@ ui <- fluidPage(
        "Instructions",
        column(
          6, offset = 3, 
+         # Overview ----
          h3("Overview"),
          p("You can use this web app to download SDFs of various molecules then 
          run QSARS to predict their affinity to cyclodextrin. The code for the 
@@ -40,6 +41,7 @@ ui <- fluidPage(
          p("The Explore tab can be used to find molecules that fit specific 
          parameters (e.g., analgesic, anti-cancer, antibiotic, FDA-approved). 
          It is currently under construction."), 
+         # Download ----
          h3("Downloading Structure Files"), 
          p("The search box on the download page goes through ", 
            a(href = "https://cactus.nci.nih.gov/chemical/structure", 
@@ -54,6 +56,12 @@ ui <- fluidPage(
            acetylsalicyclic acid instead of aspiring). Uncommon molecules or 
            newly developed pharmaceuticals may be absent from the database, and 
            will have to be hand-drawn or found elsewhere."),
+         p("Additionally, successfully obtained SDFs will be rendered in the 
+           next tab, \"Molecules\". Currently, these molecules are created 
+           using ChemmineR. Though comprehensible, I will work on my own 
+           code to clean up the graphing and make it more convenient for large 
+           numbers of molecules."),
+         # PaDEL ----
          h3("Using PaDEL-Descriptor"), 
          p("Make sure that ", 
            a(href = "https://www.yapcwsoft.com/dd/padeldescriptor/",
@@ -85,6 +93,7 @@ ui <- fluidPage(
              in the app will produce. Also, with \"Descriptor output file\", save 
              the file as a .csv.")
            ),
+         # Upload ----
          h3("Obtaining Predictions"), 
          p("Upload the .csv from PaDEL-Descriptor and select the cyclodextrin type 
            that you want to model. As of now, only alpha- and beta-cyclodextrin 
@@ -100,6 +109,7 @@ ui <- fluidPage(
            A newSk < 3 would be considered inside the applicability domain."),
          p("The table can be downloaded with \"Download Results\" and will be 
            saved as a .csv."),
+         # Explore ----
          h3("Exploring Candidates"), 
          p(em("Coming soon!"))
        )
@@ -107,6 +117,9 @@ ui <- fluidPage(
      # Download from CIR ----
      tabPanel("Download", 
               fluidRow(
+                
+                # A sidebar containing the searchbar for Cactus as well as an 
+                # option to download the generated .SDF
                 column(
                   2, offset = 2, 
                   textInput("search", 
@@ -118,6 +131,8 @@ ui <- fluidPage(
                   downloadButton('downloadData', 'Download')
                   
                 ), 
+                # The main panel. Contains the results of the CIR search and
+                # a panel containining plots of the molecular structures.
                 column(
                   6, 
                   tabsetPanel(
@@ -137,6 +152,8 @@ ui <- fluidPage(
      tabPanel(
        "Upload", 
        fluidRow(
+         # A sidebar that allows for the uploading of a file of descriptors
+         # and customization of the plot
          column(
            2, offset = 2,
           # Start with a file input for .csv of descriptors
@@ -165,6 +182,8 @@ ui <- fluidPage(
           br(),
           downloadButton('downloadPred', 'Download Results')
          ),
+         
+         # Main panel: contains the table of results and the plot of affinity
          column(
            6,
            tabsetPanel(
@@ -314,6 +333,8 @@ server <- function(input, output) {
     content = function(file) {
       
       # Write to a file specified by the 'file' argument
+      # Because certain molecules contain commas in their name, 
+      # this will be written as a .xlsx
       write.xlsx(pred() %>% 
                    full_join(., choose.x(), by = "guest") %>%
                    rename(Guest = guest, `Binding, kJ/mol` = ensemble, 
@@ -327,6 +348,8 @@ server <- function(input, output) {
   # SDF/CIR ----
   
   # An SDF in the form of a data.frame
+  # Unfortunately, I cannot handle molecules with commas in their name 
+  # because of how I'm splitting the search bar.
   SDFile <- eventReactive(
     input$searchButton, {
       download.cactus.multiple(input$search)
