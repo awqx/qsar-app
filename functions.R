@@ -1,29 +1,52 @@
-setwd("~/SREP LAB/qsar-app")
-
 # Packages =====
 
-if(!require("pacman")) { 
-  install.packages("pacman")
-  library(pacman)
-} else
-  library(pacman)
+# Manually calling library on each package instead of lapply so that rsconnect
+# picks up on the dependencies
 
-p_load(caret,
-       ChemmineR,
-       Cubist,
-       e1071, 
-       earth,
-       gbm,
-       glmnet,
-       kernlab, 
-       # pls, 
-       randomForest, 
-       RCurl, 
-       stringr,
-       tidyverse, 
-       tools,
-       XML
-)
+# ChemmineR requires a different installation
+# library("BiocManager")
+# BiocManager::install("ChemmineR")
+
+# BiocManager::repositories()
+# getOption("repos")
+
+# install.packages("caret")
+# install.packages("ChemmineR")
+# install.packages("Cubist")
+# install.packages("data.table")
+# install.packages("e1071")
+# install.packages("earth")
+# install.packages("gbm")
+# install.packages("glmnet")
+# install.packages("kernlab")
+# install.packages("randomForest")
+# install.packages("RCurl")
+# install.packages("stringr")
+# install.packages("tidyverse")
+# install.packages("tools")
+# install.packages("xlsx")
+# install.packages("XML")
+library("caret")
+library("ChemmineR")
+library("Cubist")
+library("data.table")
+library("e1071")
+library("earth")
+library("gbm")
+library("glmnet")
+library("kernlab")
+library("randomForest")
+library("RCurl")
+library("stringr")
+library("tidyverse")
+library("tools")
+library("xlsx")
+library("XML")
+
+library("shiny")
+library("shinythemes")
+library("rsconnect")
+
 
 # Variables =====
 

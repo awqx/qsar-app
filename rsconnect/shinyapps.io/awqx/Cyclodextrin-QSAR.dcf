@@ -1,0 +1,13 @@
+name: Cyclodextrin-QSAR
+title: Cyclodextrin-QSAR
+username:
+account: awqx
+server: shinyapps.io
+hostUrl: https://api.shinyapps.io/v1
+appId: 832657
+bundleId: 1982213
+url: https://awqx.shinyapps.io/Cyclodextrin-QSAR/
+when: 1554230517.5955
+asMultiple: FALSE
+asStatic: FALSE
+ignoredFiles: test

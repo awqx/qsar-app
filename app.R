@@ -1,8 +1,6 @@
-# install.packages("ggvis")
-library(shiny)
+# Cyclodextrin Affinity Prediction
 
 source("./functions.R")
-p_load(data.table, shiny, shinythemes)
 
 # UI =====
 # Define UI for application that draws a histogram
@@ -13,7 +11,7 @@ ui <- fluidPage(
    
    navbarPage(
      theme = "yeti", 
-     "Cyclodextrin Affinity Predictions", 
+     "Cyclodextrin Affinity Prediction", 
      # Instructions -----
      tabPanel(
        "Instructions",
