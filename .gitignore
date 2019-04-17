@@ -6,3 +6,7 @@
 # Files where I test functions
 test.R
 test/
+
+# Molecules
+  # Not uploaded because of concerns about file size
+explore/fda-molecules
