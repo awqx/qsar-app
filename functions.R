@@ -64,6 +64,11 @@ beta.models <- readRDS("./qsar/beta/models.RDS")
 beta.pp <- readRDS("./qsar/beta/pp.settings.RDS")
 beta.vars <- readRDS("./qsar/beta/vars.RDS")
 
+# Explore 
+# FDA database
+
+fda.explore <- readRDS("./explore/fda-pred.RDS")
+
 # Pre-processing =====
 
     # Fill-in -----
@@ -289,5 +294,16 @@ check.sdf <- function(sdf, guest) {
 }
 
 write.sdf <- function() {
+  
+}
+
+# Downloads the SDF into a file rather than as an R object
+# path: the folder to write the file, not the filename, should end in backslash
+
+download.cactus.file <- function(guest, path) {
+  
+  download.cactus(guest) %>%
+    write.table(., file = paste0(path, guest, ".SDF"), 
+                quote = F, col.names = F, row.names = F)
   
 }

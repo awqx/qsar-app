@@ -196,16 +196,30 @@ ui <- fluidPage(
               fluidRow(
                 column(
                   2, offset = 2, 
-                  textInput("search", 
-                            label = h5("Guest Name")), 
-                  actionButton("searchExplore", "Search")
+                  h6("Search for specific molecules in the data table or search by category"),
+                  checkboxGroupInput("exploreCD", h5("Cyclodextrin Type"), 
+                                     choices = list("Alpha" = "a", "Beta" = "b")),
+                  br(), 
+                  sliderInput("explorePredRange", h5("Range of predictions, kJ/mol"), 
+                              min = -50, max = 50, value = c(-30, 10)),
+                  br(), 
+                  sliderInput("exploreAD", h5("Applicability Domain, newSk"), 
+                              min = 0, max = 6, value = c(0, 3))
+                ), 
+                # Main panel with the predictions
+                column(
+                  6,
+                  tabsetPanel(
+                    tabPanel("Table", DT::dataTableOutput("exploreTable")),
+                    tabPanel("Plot", plotOutput("explorePlot")) 
+                  )
                 )
               ))
    )
 )
 
 # Server =====
-# Define server logic required to draw a histogram
+
 server <- function(input, output) {
   
   # QSAR ----
@@ -422,6 +436,33 @@ server <- function(input, output) {
   }
   )
 
+  # Explore ----
+  
+  explore.sort <- reactive({
+    
+    explore.sort <- fda.explore %>%
+      filter(ensemble > input$explorePredRange[1] & ensemble < input$explorePredRange[2]) %>%
+      filter(newSk > input$exploreAD[1] & newSk < input$exploreAD[2]) 
+    
+    if(!("a" %in% input$exploreCD))
+      explore.sort <- explore.sort %>% filter(cd != "Alpha")
+    if(!("b" %in% input$exploreCD))
+      explore.sort <- explore.sort %>% filter(cd != "Beta")
+    
+    return(explore.sort)
+    
+  })
+  output$exploreTable <- DT::renderDataTable({
+    if(is.null(explore.sort()))
+      return(NULL)
+    
+    explore.sort() %>% 
+      mutate(ensemble = round(ensemble, 1), 
+             newSk = round(newSk, 2)) %>%
+      rename(Guest = guest, `Binding, kJ/mol` = ensemble, 
+             `Applicability` = domain, `Cyclodextrin Type` = cd) 
+  })
+  
 }
 
 # Run =====

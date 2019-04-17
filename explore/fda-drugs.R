@@ -100,7 +100,7 @@ lapply(fda5,
 
 # Empties
 # A list of all failed downloads
-# 20.34% failed, 285/1401
+# 20.34% failed, 285/1401 (or 1116 successes)
 fda.failed <- lapply(set.paths, find.empties) %>% unlist()
 saveRDS(fda.failed, "./explore/failed-dwnld.RDS")
 
@@ -175,3 +175,5 @@ saveRDS(fda, "./explore/fda-pred.RDS")
 
 # 638 are within the applicability domain
 # 638/1401 = 45.5%
+
+# 1401 molecules --> 1116 downloaded from Cactus --> 1031 through PaDEL
