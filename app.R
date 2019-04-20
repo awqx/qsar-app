@@ -211,7 +211,16 @@ ui <- fluidPage(
                   6,
                   tabsetPanel(
                     tabPanel("Table", DT::dataTableOutput("exploreTable")),
-                    tabPanel("Plot", plotOutput("explorePlot")) 
+                    tabPanel("Plot", 
+                             div(
+                               style = "position:relative", 
+                               plotOutput("explorePlot",  
+                                          hover = hoverOpts(id = "exploreHover")), 
+                               uiOutput("hoverInfo")) 
+                             )
+                             
+                             #          , 
+                             # verbatimTextOutput("hoverInfo")) 
                   )
                 )
               ))
@@ -305,7 +314,8 @@ server <- function(input, output) {
       lims(x = input$xrange, y = input$yrange) + 
       scale_shape_manual(values = c(16, 4)) + 
       labs(x = "newSk", y = "Binding, kJ/mol", 
-           color = "Cyclodextrin", shape = "Applicability")
+           color = "Cyclodextrin", shape = "Applicability") + 
+      theme(text = element_text(size = 14))
     else
       ggplot(full_join(pred(), choose.x(), by = "guest"), 
              aes_string(y = "ensemble", 
@@ -317,7 +327,8 @@ server <- function(input, output) {
         lims(x = input$xrange, y = input$yrange) + 
         scale_shape_manual(values = c(16, 4)) + 
         labs(x = input$xaxis, y = "Binding, kJ/mol", 
-             color = "Cyclodextrin", shape = "Applicability") 
+             color = "Cyclodextrin", shape = "Applicability") + 
+      theme(text = element_text(size = 14))
   })
   
   # A table that displays guest name, predicted affinity, applicability domain, 
@@ -452,18 +463,69 @@ server <- function(input, output) {
     return(explore.sort)
     
   })
+  
   output$exploreTable <- DT::renderDataTable({
     if(is.null(explore.sort()))
       return(NULL)
-    
     explore.sort() %>% 
       mutate(ensemble = round(ensemble, 1), 
              newSk = round(newSk, 2)) %>%
+      mutate(guest = toTitleCase(guest)) %>%
       rename(Guest = guest, `Binding, kJ/mol` = ensemble, 
              `Applicability` = domain, `Cyclodextrin Type` = cd) 
   })
   
+  output$explorePlot <- renderPlot({
+    if(is.null(explore.sort()))
+      return(NULL)
+    fda.data <- as.data.frame(explore.sort())
+    fda.data$cd <- as.factor(fda.data$cd)
+    levels(fda.data$cd) <- c("Alpha-CD", "Beta-CD")
+    ggplot(fda.data, aes(x = newSk, y = ensemble, color = cd)) + 
+      geom_point() + 
+      theme_bw() + 
+      labs(y = "Predicted dG, kJ/mol", 
+           x = "Applicability, newSk", 
+           color = "Host") + 
+      theme(text = element_text(size = 14))
+    
+  })
+  # Credit to Pawel, https://gitlab.com/snippets/16220
+  output$hoverInfo <- renderUI({
+    
+    hover <- input$exploreHover
+    point <- nearPoints(explore.sort(), hover, threshold = 5, 
+                        maxpoints = 1, addDist = T)
+    if(nrow(point) == 0) # no plot exists
+      return(NULL)
+    
+    # Calculate point position inside the image as percent of dimensions
+    left.pct <- (hover$x - hover$domain$left) / (hover$domain$right - hover$domain$left)
+    top.pct <- (hover$domain$top - hover$y) / (hover$domain$top - hover$domain$bottom)
+    
+    # Calculate distance in pixels
+    left.px <- hover$range$left + left.pct * (hover$range$right - hover$range$left)
+    top.px <- hover$range$top + top.pct * (hover$range$bottom - hover$range$top)
+    
+    # Style the tooltip
+    style <- paste0("position:absolute; z-index:100; ", 
+                    "background-color: rgba(245, 245, 245, 0.85); ",
+                    "left:", left.px + 2, "px; top:", top.px + 2, "px;")
+    
+    # Create tooltip as wellPanel
+    wellPanel(
+      style = style, 
+      p(HTML(paste0(
+        "<b>Guest: </b>", toTitleCase(point$guest), "<br/>",
+        "<b>Affinity: </b>", round(point$ensemble, 1), "kJ/mol <br/>", 
+        "<b>Host: </b>", point$cd, "<br/>", 
+        "<b>Applicability: </b>", ifelse(point$newSk < 3, "Inside", "Outside")
+        )))
+    )
+    
+  })
 }
+
 
 # Run =====
 # Run the application 
