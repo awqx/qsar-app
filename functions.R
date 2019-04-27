@@ -20,6 +20,7 @@
 # install.packages("glmnet")
 # install.packages("kernlab")
 # install.packages("randomForest")
+# install.packages("rcdk")
 # install.packages("RCurl")
 # install.packages("stringr")
 # install.packages("tidyverse")
@@ -27,7 +28,6 @@
 # install.packages("xlsx")
 # install.packages("XML")
 library("caret")
-library("ChemmineR")
 library("Cubist")
 library("data.table")
 library("e1071")
@@ -36,6 +36,7 @@ library("gbm")
 library("glmnet")
 library("kernlab")
 library("randomForest")
+library("rcdk")
 library("RCurl")
 library("stringr")
 library("tidyverse")
@@ -307,3 +308,224 @@ download.cactus.file <- function(guest, path) {
                 quote = F, col.names = F, row.names = F)
   
 }
+
+
+install.packages("rcdk")
+library(rcdk)
+library(devtools)
+install_github("cran/rcdk")
+library(rcdk)
+mols <- load.molecules(c("./explore/fda-molecules/set1/acarbose.SDF", 
+                         "./explore/fda-molecules/set1/amoxicillin.SDF", 
+                         "./explore/fda-molecules/set1/dimercaprol.SDF", 
+                         "./explore/fda-molecules/set1/mesalamine.SDF"))
+dep <- get.depictor(width = 400, height = 400, 
+                    style = "cow")
+
+img <- view.image.2d(mols[[1]], dep)
+img2 <- view.image.2d(mols[[2]], dep)
+img3 <-  view.image.2d(mols[[3]], dep)
+
+plot(1, type="n", xlab="", ylab="", 
+     xlim=c(0, 10), ylim=c(0, 10), 
+     axes = F)
+rasterImage(view.image.2d(mols[[1]], dep),
+            1, 6, 4, 10, interpolate = T)
+rasterImage(view.image.2d(mols[[2]], dep), 
+            5, 6, 9, 10, interpolate = T)
+rasterImage(view.image.2d(mols[[3]], dep),
+            1, 0, 4, 4, interpolate = T)
+rasterImage(view.image.2d(mols[[4]], dep),
+            5, 0, 9, 4, interpolate = T)
+text(1.5, 10, "1. Amoxicillin")
+text(1.5, 4.5, "3. Dimercaprol")
+text(6.5, 10, "2. Amoxicillin")
+text(6.5, 4.5, "4. Mesalamine")
+rasterImage(img, 1, 1, 10, 10, interpolate = T)
+
+x <- 1:20
+y <- runif(20)
+plot(x, y, axes=FALSE, frame.plot=TRUE)
+Axis(side=1, labels=FALSE)
+Axis(side=2, labels=FALSE)
+
+# acyclovir <- parse.smiles("NC1=NC(=O)c2ncn(COCCO)c2N1")[[1]]
+# view.molecule.2d(acyclovir)
+# 
+# m <- parse.smiles("Cl*.Cl*.c1ccccc1-c1ccccc1 |m:1:4.5.6.7.8.9,3:10.11.12.13.14.15|")[[1]]
+# dep <- get.depictor(width=300, height=300, style='nob')
+# view.molecule.2d(m, dep)
+# copy.image.to.clipboard(m, dep)
+# img <- view.image.2d(m, dep)
+# Molecules =====
+    # Read SMILES
+# A modification of download.cactus to get SMILES
+download.smiles <- function(guest) {
+  guest.url      <- URLencode(guest, reserved = T)
+  tryCatch({ 
+    # Chemical format must be parsed to match all the outputs from NCI cactus
+    URL            <-
+      paste0("https://cactus.nci.nih.gov/chemical/structure/",
+             guest.url,
+             "/smiles")
+    # return the SMILES string
+    return(as.character(readLines(URL, warn = F)))
+  },
+  warning = function(warn) {
+    message(paste0("Warning: URL could not be read. Check for typos or try alternate name for ", guest))
+    return(as.character(readLines(URL, warn = F)))
+  },
+  error = function(err) {
+    message(paste0("Error: the structure file for ", guest, " could not be found"))
+    return("")
+  },
+  finally = {
+    message(guest, " processed")
+  })
+}
+
+library(svglite)
+library(slickR)
+# Returns a vector of smiles
+# Not yet used, but could be alternative to SDF because of smaller file size
+download.smiles.multiple <- function(guest) {
+  guest <- strsplit(guest, ",") %>% lapply(str_trim) %>% unlist()
+  smiles <- sapply(guest, download.smiles)
+  return(smiles)
+}
+
+
+# Renders the guests into different plots, each with four different molecules
+# Plots are formatted as XML 
+plot.smiles <- function(guest) {
+  
+  guest <- strsplit(guest, ",") %>% lapply(str_trim) %>% unlist()
+  smiles <- sapply(guest, download.smiles)
+  names(smiles) <- toTitleCase(names(smiles))
+  mol <- parse.smiles(smiles)
+  dep <- get.depictor(width = 400, height = 400, 
+                      style = "cow")
+  
+  plots <- 
+    lapply(
+    # Creating the divisons
+    1:ceiling(length(mol)/4), 
+    function(x) {
+      # Creating a page
+      selected.mol <- (x-1)*4 + 1:4
+      selected.mol <- selected.mol[!selected.mol > length(mol)]
+      # Grabbing the 4 molecules to populate the plot
+      mol.page <- mol[selected.mol]
+      # Saving the names
+      mol.names <- names(mol.page)
+      # Renaming each to correspond to their location
+      # upper left, upper right, bottom left, bottom right
+      pos <- c("ul", "ur", "bl", "br") %>%
+        head(length(selected.mol)) # so that names fit the molecules
+      names(mol.page) <- pos
+      
+      # Creating the base graph
+      xmlSVG({
+        windowsFonts(A = windowsFont("D-DIN"))
+        plot(1, type="n", xlab="", ylab="", 
+             xlim=c(0, 10), ylim=c(0, 10), 
+             axes = F)
+        
+        for(i in 1:length(pos)) {
+          switch(
+            names(mol.page)[i],
+            "ul" = {
+              rasterImage(view.image.2d(mol.page[[i]], dep), 
+                          0.5, 5, 4, 9.5, interpolate = T)
+              text(1.5, 10, mol.names[i], family = "A")
+            }, 
+            "ur" = {
+              rasterImage(view.image.2d(mol.page[[i]], dep), 
+                          4.5, 5, 9, 9.5, interpolate = T)
+              text(6.5, 10, mol.names[i], family = "A")
+            },
+            "bl" = {
+              rasterImage(view.image.2d(mol.page[[i]], dep), 
+                          0.5, 0, 5, 4.5, interpolate = T)
+              text(1.5, 4.5, mol.names[i], family = "A")
+            }, 
+            "br" = {
+              rasterImage(view.image.2d(mol.page[[i]], dep), 
+                          4.5, 0, 9, 4.5, interpolate = T)
+              text(6.5, 4.5, mol.names[i], family = "A")
+            })
+        }
+      }, standalone = T)
+    }
+  )
+  return(plots)
+}
+
+
+plot.smiles <- function(guest) {
+  
+  guest <- strsplit(guest, ",") %>% lapply(str_trim) %>% unlist()
+  smiles <- sapply(guest, download.smiles)
+  names(smiles) <- toTitleCase(names(smiles))
+  mol <- parse.smiles(smiles)
+  dep <- get.depictor(width = 300, height = 300, 
+                      style = "cow")
+  
+  plots <- 
+    lapply(
+      # Creating the divisons
+      1:ceiling(length(mol)/4), 
+      function(x) {
+        # Creating a page
+        selected.mol <- (x-1)*4 + 1:4
+        selected.mol <- selected.mol[!selected.mol > length(mol)]
+        # Grabbing the 4 molecules to populate the plot
+        mol.page <- mol[selected.mol]
+        # Saving the names
+        mol.names <- names(mol.page)
+        # Renaming each to correspond to their location
+        # upper left, upper right, bottom left, bottom right
+        pos <- c("ul", "ur", "bl", "br") %>%
+          head(length(selected.mol)) # so that names fit the molecules
+        names(mol.page) <- pos
+        
+        # Creating the base graph
+        windowsFonts(A = windowsFont("D-DIN"))
+        plot(1, type="n", xlab="", ylab="", 
+             xlim=c(0, 10), ylim=c(0, 10), 
+             axes = F)
+        
+        for(i in 1:length(pos)) {
+          switch(
+            names(mol.page)[i],
+            "ul" = {
+              rasterImage(view.image.2d(mol.page[[i]], dep), 
+                          0.5, 5, 4, 9.5, interpolate = T)
+              text(1.5, 10, mol.names[i], family = "A")
+            }, 
+            "ur" = {
+              rasterImage(view.image.2d(mol.page[[i]], dep), 
+                          4.5, 5, 9, 9.5, interpolate = T)
+              text(6.5, 10, mol.names[i], family = "A")
+            },
+            "bl" = {
+              rasterImage(view.image.2d(mol.page[[i]], dep), 
+                          0.5, 0, 5, 4.5, interpolate = T)
+              text(1.5, 4.5, mol.names[i], family = "A")
+            }, 
+            "br" = {
+              rasterImage(view.image.2d(mol.page[[i]], dep), 
+                          4.5, 0, 9, 4.5, interpolate = T)
+              text(6.5, 4.5, mol.names[i], family = "A")
+            })
+        }
+
+      }
+    )
+  return(plots)
+}
+
+plot.smiles("amoxicillin, ibuprofen, dimercaprol, mesalamine, acetaminophen, ibuprofen")
+smiles <- download.smiles.multiple("amoxicillin, acetaminophen, ibuprofen")
+mols <- parse.smiles(smiles)
+
