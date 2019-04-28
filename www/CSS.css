@@ -1,0 +1,20 @@
+@font-face {
+  src: url(D-DIN.ttf);
+  font-family: "D-DIN";
+}
+
+@font-face {
+  src: url(AnkaCoder-C75-r.ttf);
+  font-family: "Anka";
+}
+
+body {
+  font-family: "D-DIN", Helvetica, sans-serif;
+  font-size: 16px;
+}
+
+h3, 
+h4 {
+  font-family:"Anka", Helvetica,sans-serif; 
+  text-transform: uppercase;
+}
