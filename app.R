@@ -6,6 +6,9 @@ source("./functions.R")
 # Define UI for application that draws a histogram
 ui <- fluidPage(
    theme = shinytheme("sandstone"),
+   tags$head(includeCSS("www/CSS.css")),
+
+   # tags$head(tags$style(".shiny-plot-output{height:100vh !important;}")),
    # Style ====
    #' tags$head(
    #'   tags$style(
@@ -126,7 +129,13 @@ ui <- fluidPage(
            saved as a .csv."),
          # Explore ----
          h3("Exploring Candidates"), 
-         p(em("Coming soon!"))
+         p("This tab contains the predicted affinities of around 1000 FDA approved
+           molecules, sourced from the Orange Book (39th Edition). The table to the 
+           right contains all the available values. Molecules can be searched by 
+           name with the search feature of the data table, or by selecting specific
+           points on the graph in the next page. To narrow down candidates, there are
+           options to sort the group by cyclodextrin type, predicted affinity, and
+           applicability.")
        )
      ),
      # Download from CIR ----
@@ -138,7 +147,7 @@ ui <- fluidPage(
                 column(
                   2, offset = 2, 
                   textInput("search", 
-                            label = h5("Chemical Identifier Resolver")),
+                            label = h4("Chemical Identifier Resolver")),
                   h6("Add multiple chemical names by separating names with a comma"),
                   actionButton("searchButton", "Search"),
                   br(), 
@@ -157,12 +166,19 @@ ui <- fluidPage(
                     ),
                     tabPanel(
                       "Molecules", 
-                      plotOutput("molecules")
+                      # slickROutput("molecules")
+                      plotOutput("molecules", width = "100%"), 
+                      fluidRow(
+                        column(1, offset = 4, actionButton("prev", "PREV")), 
+                        column(2, offset = 0.5, textOutput("pageCount")), 
+                        column(1, offset = 0.5, actionButton("next", "NEXT")), 
+                        tags$style(type='text/css', "#pageCount { text-align: center; font-size: 16px}")
+                      )
                     )
-                  ),
-                  uiOutput("filePreview")
+                  )
                 )
-              )), 
+              )
+              ), 
      # Upload and run QSAR ----
      tabPanel(
        "Upload", 
@@ -174,22 +190,22 @@ ui <- fluidPage(
           # Start with a file input for .csv of descriptors
           # Sidebar with a slider input for number of bins 
           fileInput("padel",
-                    h5("PaDEL-Descriptor Output"),
+                    h4("PaDEL-Descriptor Output"),
                     multiple = T, 
                     accept = c(
                       "text/csv",
                       "text/comma-separated-values,text/plain",
                       ".csv")), 
           br(), 
-          checkboxGroupInput("cd", h5("Cyclodextrin Type"), 
+          checkboxGroupInput("cd", h4("Cyclodextrin Type"), 
                              choices = list("Alpha" = "a", "Beta" = "b")),
           br(), 
-          radioButtons("xaxis", h5("Variable on x-axis"), 
+          radioButtons("xaxis", h4("Variable on x-axis"), 
                        c("Molecular weight" = "MW",
                          "Number of atoms" = "nAtom", 
                          "Applicability" = "ad")), 
           br(), 
-          sliderInput("yrange", h5("Range of predictions, kJ/mol"), 
+          sliderInput("yrange", h4("Range of predictions, kJ/mol"), 
                       min = -50, max = 50, value = c(-30, 10)),
           # "Gamma" = "c" not available yet
           br(), 
@@ -214,13 +230,13 @@ ui <- fluidPage(
                 column(
                   2, offset = 2, 
                   h6("Search for specific molecules in the data table or search by category"),
-                  checkboxGroupInput("exploreCD", h5("Cyclodextrin Type"), 
+                  checkboxGroupInput("exploreCD", h4("Cyclodextrin Type"), 
                                      choices = list("Alpha" = "a", "Beta" = "b")),
                   br(), 
-                  sliderInput("explorePredRange", h5("Range of predictions, kJ/mol"), 
+                  sliderInput("explorePredRange", h4("Range of predictions, kJ/mol"), 
                               min = -50, max = 50, value = c(-30, 10)),
                   br(), 
-                  sliderInput("exploreAD", h5("Applicability Domain, newSk"), 
+                  sliderInput("exploreAD", h4("Applicability Domain, newSk"), 
                               min = 0, max = 6, value = c(0, 3))
                 ), 
                 # Main panel with the predictions
@@ -441,28 +457,60 @@ server <- function(input, output) {
   )
   
   # Plotting molecules from the SDF using ChemmineR
-  output$molecules <- renderPlot({
+  # plots <- reactive({
+  #   if(is.null(SDFile()))
+  #     return(NULL)
+  #   plots <- plot.smiles(input$search)
+  #   plots.SVG <- sapply(plots, function(x) {
+  #     paste0("data:image/svg+xml;utf8", as.character(x))
+  #   })
+  #   return(plots.SVG)
+  # })
+  # 
+  
+  # output$molecules <- renderSlickR({
+  #   if(is.null(SDFile()))
+  #     return(NULL)
+  #   plots <- isolate(plot.smiles(input$search))
+  #   plots.SVG <- sapply(plots, function(sv) {
+  #     hash_encode_url(paste0("data:image/svg+xml;utf8,",as.character(sv)))
+  #   })
+  #   slickR(plots.SVG)
+  #   # plots <- lapply(1:5, function(i){
+  #   #   xmlSVG({plot(rnorm(50), main=paste0("Iteration ", i))}, standalone = TRUE)
+  #   # })
+  #   # #make the plot self contained SVG to pass into slickR
+  #   # plotsAsSVG <- sapply(plots, function(sv){
+  #   #   paste0("data:image/svg+xml;utf8,",as.character(sv))
+  #   # })
+  #   # slickR(plotsAsSVG)
+  # })
+  
+  # # Credit to Stephane Laurent, 
+  # https://stackoverflow.com/questions/52071825/shiny-click-for-next-plot
+  mol.plots <- reactive({
     if(is.null(SDFile()))
-      return()
-    guest.sdf <- isolate(
-      SDFile() %>%
-        unlist() %>% as.character() %>% 
-        read.SDFstr() %>% read.SDFset()
-      ) 
-    guest.name <- isolate({
-      all.guests <- strsplit(input$search, ",") %>% 
-        lapply(str_trim) %>% unlist() %>% toTitleCase()
-      check.guests <- isolate(check.sdf(SDFile(), input$search)) 
-      all.guests[check.guests]
-    }
-      
-    )
-    plot(guest.sdf,
-         # griddim = c(2, 2), # I would like for plots to be separated
-         print_cid = guest.name,
-         print = F)
-  }
-  )
+      return(NULL)
+    plot.smiles(input$search)
+  })
+  index <- reactiveVal(1)
+  observeEvent(input[["prev"]], {
+    index(max(index() - 1, 1))
+  })
+  observeEvent(input[["next"]], {
+    index(min(index()+1, length(mol.plots())))
+  })
+  output$molecules <- renderPlot({
+    mol.plots()[[index()]]
+  })
+  
+  # a UI output recording the pages of molecules
+  output$pageCount <- renderText({
+    if(is.null(SDFile()))
+      print("Page 0/0")
+    paste0("Page ", index(), "/", length(mol.plots()))
+  })
+    
 
   # Explore ----
   
