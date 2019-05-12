@@ -198,7 +198,7 @@ ui <- fluidPage(
                       ".csv")), 
           br(), 
           checkboxGroupInput("cd", h4("Cyclodextrin Type"), 
-                             choices = list("Alpha" = "a", "Beta" = "b")),
+                             choices = list("Alpha-CD" = "a", "Beta-CD" = "b")),
           br(), 
           radioButtons("xaxis", h4("Variable on x-axis"), 
                        c("Molecular weight" = "MW",
@@ -231,7 +231,7 @@ ui <- fluidPage(
                   2, offset = 2, 
                   h6("Search for specific molecules in the data table or search by category"),
                   checkboxGroupInput("exploreCD", h4("Cyclodextrin Type"), 
-                                     choices = list("Alpha" = "a", "Beta" = "b")),
+                                     choices = list("Alpha-CD" = "a", "Beta-CD" = "b")),
                   br(), 
                   sliderInput("explorePredRange", h4("Range of predictions, kJ/mol"), 
                               min = -50, max = 50, value = c(-30, 10)),
@@ -256,7 +256,18 @@ ui <- fluidPage(
                              # verbatimTextOutput("hoverInfo")) 
                   )
                 )
-              ))
+              )) #, 
+     # tabPanel("Release", 
+     #          fluidRow(
+     #            column(
+     #              2, offset = 2, 
+     #              h6("Simulate the release of drug from a solid cylinder of 
+     #                 polymer into water"), 
+     #              sliderInput("releaseTime", h4("Duration of Release, hours"), 
+     #                          min = 100, max = 1000, value = 350)
+     #            ), 
+     #            column(6)
+     #          ))
    )
 )
 
@@ -313,7 +324,7 @@ server <- function(input, output) {
       qsar <- ensemble(pp.a, alpha.models) %>%
         select(., guest, ensemble)
       # Appending cyclodextrin type and results of app domain to results
-      alpha <- full_join(ad, qsar, by = "guest") %>% mutate(CD = "Alpha")  %>%
+      alpha <- full_join(ad, qsar, by = "guest") %>% mutate(CD = "Alpha-CD")  %>%
         mutate(guest = as.character(guest), 
                ensemble = signif(ensemble, digits = 3))
     }
@@ -326,7 +337,7 @@ server <- function(input, output) {
       qsar <- ensemble(pp.b, beta.models) %>%
         select(., guest, ensemble)
       # Appending cyclodextrin type and results of app domain to results
-      beta <- full_join(ad, qsar, by = "guest") %>% mutate(CD = "Beta")  %>%
+      beta <- full_join(ad, qsar, by = "guest") %>% mutate(CD = "Beta-CD")  %>%
         mutate(guest = as.character(guest), 
                ensemble = signif(ensemble, digits = 3))
     }
@@ -337,6 +348,8 @@ server <- function(input, output) {
   output$predPlot <- renderPlot({
     if(is.null(input$cd) || is.null(input$padel))
       return()
+    # pred()$domain <- as.factor(pred()$domain)
+    # levels(pred()$domain) <- c("Inside", "Outside")
     if(input$xaxis == "ad")
       ggplot(pred(), aes(y = ensemble, 
                          x = newSk, 
@@ -346,9 +359,10 @@ server <- function(input, output) {
       theme_bw() + 
       lims(x = input$xrange, y = input$yrange) + 
       scale_shape_manual(values = c(16, 4)) + 
+      scale_color_manual(values = c("#A0C3AA", "#40798C")) +
       labs(x = "newSk", y = "Binding, kJ/mol", 
-           color = "Cyclodextrin", shape = "Applicability") + 
-      theme(text = element_text(size = 14))
+           color = "Host", shape = "Applicability") + 
+      theme(text = element_text(size = 16, family = "D-DIN"))
     else
       ggplot(full_join(pred(), choose.x(), by = "guest"), 
              aes_string(y = "ensemble", 
@@ -360,8 +374,10 @@ server <- function(input, output) {
         lims(x = input$xrange, y = input$yrange) + 
         scale_shape_manual(values = c(16, 4)) + 
         labs(x = input$xaxis, y = "Binding, kJ/mol", 
-             color = "Cyclodextrin", shape = "Applicability") + 
-      theme(text = element_text(size = 14))
+             color = "Host", shape = "Applicability") + 
+        theme(text = element_text(size = 16, family = "D-DIN")) + 
+        scale_color_manual(values = c("#A0C3AA", "#40798C"))
+    
   })
   
   # A table that displays guest name, predicted affinity, applicability domain, 
@@ -456,36 +472,6 @@ server <- function(input, output) {
     }
   )
   
-  # Plotting molecules from the SDF using ChemmineR
-  # plots <- reactive({
-  #   if(is.null(SDFile()))
-  #     return(NULL)
-  #   plots <- plot.smiles(input$search)
-  #   plots.SVG <- sapply(plots, function(x) {
-  #     paste0("data:image/svg+xml;utf8", as.character(x))
-  #   })
-  #   return(plots.SVG)
-  # })
-  # 
-  
-  # output$molecules <- renderSlickR({
-  #   if(is.null(SDFile()))
-  #     return(NULL)
-  #   plots <- isolate(plot.smiles(input$search))
-  #   plots.SVG <- sapply(plots, function(sv) {
-  #     hash_encode_url(paste0("data:image/svg+xml;utf8,",as.character(sv)))
-  #   })
-  #   slickR(plots.SVG)
-  #   # plots <- lapply(1:5, function(i){
-  #   #   xmlSVG({plot(rnorm(50), main=paste0("Iteration ", i))}, standalone = TRUE)
-  #   # })
-  #   # #make the plot self contained SVG to pass into slickR
-  #   # plotsAsSVG <- sapply(plots, function(sv){
-  #   #   paste0("data:image/svg+xml;utf8,",as.character(sv))
-  #   # })
-  #   # slickR(plotsAsSVG)
-  # })
-  
   # # Credit to Stephane Laurent, 
   # https://stackoverflow.com/questions/52071825/shiny-click-for-next-plot
   mol.plots <- reactive({
@@ -510,7 +496,6 @@ server <- function(input, output) {
       print("Page 0/0")
     paste0("Page ", index(), "/", length(mol.plots()))
   })
-    
 
   # Explore ----
   
@@ -546,13 +531,17 @@ server <- function(input, output) {
     fda.data <- as.data.frame(explore.sort())
     fda.data$cd <- as.factor(fda.data$cd)
     levels(fda.data$cd) <- c("Alpha-CD", "Beta-CD")
-    ggplot(fda.data, aes(x = newSk, y = ensemble, color = cd)) + 
+    levels(fda.data$domain) <- c("Inside", "Outside")
+    ggplot(fda.data, aes(x = newSk, y = ensemble, color = cd, shape = domain)) + 
       geom_point() + 
       theme_bw() + 
       labs(y = "Predicted dG, kJ/mol", 
            x = "Applicability, newSk", 
-           color = "Host") + 
-      theme(text = element_text(size = 14))
+           color = "Host", 
+           shape = "Domain") + 
+      theme(text = element_text(size = 16, family = "D-DIN")) + 
+      scale_color_manual(values = c("#A0C3AA", "#40798C")) + 
+      scale_shape_manual(values = c(16, 4))
     
   })
   # Credit to Pawel, https://gitlab.com/snippets/16220

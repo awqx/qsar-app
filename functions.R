@@ -51,7 +51,7 @@ library("slickR")
 library("tools")
 library("rsconnect")
 
-
+loadfonts()
 # Variables =====
 
 # Alpha-CD
@@ -529,3 +529,52 @@ plot.smiles <- function(guest) {
   return(plots)
 }
 # 
+
+# Release ====
+
+# Sourced from Edgardo Rivera-Delgado (ERD) from 
+# https://github.com/eriveradelgado/ODE_Practice
+affinity <- function(t, state, parms, ...) {
+  with(as.list(c(state, parms)), {
+    
+    # extracting states
+    ligand  <- state[1:n]
+    complex <- state[(n+1):(2*n)]
+    release <- state[2*n + 1]
+    
+    # initializing partial derivatives
+    dligand  <- rep(0, N)
+    dcomplex <- rep(0, N)
+    drelease <- 0
+    rb       <- rep(0, N)
+    
+    # MOL
+      # Binding of ligand to host
+    for(i in 1:(n - 1)) {
+      rb[i] <- p1 * ligand[i] * (p3 - complex[i]) - complex[i]
+    }
+    
+     # Diffusion of ligand through media
+    dligand[1] <- p2 * (ligand[2] - ligand[1]) / delta^2 - rb[1]
+    
+      # polymer-media interface
+    dligand[n-1] <- p2 * (-2*ligand[n-1] + ligand[n-2] / delta^2 - rb[n-1])
+    
+      # layers between the interface and the center
+    for(i in 2:(n-2)) {
+      dligand[i] <- 
+        p2 * (ligand[i+1] - 2*ligand[i] + ligand[i-1] / delta^2 - rb[i])
+      
+        # Change in [complex] through polymer
+      dcomplex <- rb
+        
+        # release: amount of ligand exiting into media
+      drelease <- -p2 * (ligand[n] - ligand[n - 1]) / delta^2
+      dudt <- c(dligand, dcomplex, drelease)
+      
+      ncal <<- ncall + 1
+      
+      return(list(dudt))
+    }
+  })
+}
