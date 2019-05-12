@@ -139,46 +139,47 @@ ui <- fluidPage(
        )
      ),
      # Download from CIR ----
-     tabPanel("Download", 
-              fluidRow(
-                
-                # A sidebar containing the searchbar for Cactus as well as an 
-                # option to download the generated .SDF
-                column(
-                  2, offset = 2, 
-                  textInput("search", 
-                            label = h4("Chemical Identifier Resolver")),
-                  h6("Add multiple chemical names by separating names with a comma"),
-                  actionButton("searchButton", "Search"),
-                  br(), 
-                  br(),
-                  downloadButton('downloadData', 'Download')
-                  
-                ), 
-                # The main panel. Contains the results of the CIR search and
-                # a panel containining plots of the molecular structures.
-                column(
-                  6, 
-                  tabsetPanel(
-                    tabPanel(
-                      "Results", 
-                      DT::dataTableOutput("SDFTable")
-                    ),
-                    tabPanel(
-                      "Molecules", 
-                      # slickROutput("molecules")
-                      plotOutput("molecules", width = "100%"), 
-                      fluidRow(
-                        column(1, offset = 4, actionButton("prev", "PREV")), 
-                        column(2, offset = 0.5, textOutput("pageCount")), 
-                        column(1, offset = 0.5, actionButton("next", "NEXT")), 
-                        tags$style(type='text/css', "#pageCount { text-align: center; font-size: 16px}")
-                      )
-                    )
+     tabPanel(
+       "Download", 
+          fluidRow(
+            
+            # A sidebar containing the searchbar for Cactus as well as an 
+            # option to download the generated .SDF
+            column(
+              2, offset = 2, 
+              textInput("search", 
+                        label = h4("Chemical Identifier Resolver")),
+              h6("Add multiple chemical names by separating names with a comma"),
+              actionButton("searchButton", "Search"),
+              br(), 
+              br(),
+              downloadButton('downloadData', 'Download')
+              
+            ), 
+            # The main panel. Contains the results of the CIR search and
+            # a panel containining plots of the molecular structures.
+            column(
+              6, 
+              tabsetPanel(
+                tabPanel(
+                  "Results", 
+                  DT::dataTableOutput("SDFTable")
+                ),
+                tabPanel(
+                  "Molecules", 
+                  # slickROutput("molecules")
+                  plotOutput("molecules", width = "100%"), 
+                  fluidRow(
+                    column(1, offset = 4, actionButton("prev", "PREV")), 
+                    column(2, offset = 0.5, textOutput("pageCount")), 
+                    column(1, offset = 0.5, actionButton("next", "NEXT")), 
+                    tags$style(type='text/css', "#pageCount { text-align: center; font-size: 16px}")
                   )
                 )
               )
-              ), 
+            )
+          )
+          ), 
      # Upload and run QSAR ----
      tabPanel(
        "Upload", 
@@ -256,18 +257,19 @@ ui <- fluidPage(
                              # verbatimTextOutput("hoverInfo")) 
                   )
                 )
-              )) #, 
-     # tabPanel("Release", 
-     #          fluidRow(
-     #            column(
-     #              2, offset = 2, 
-     #              h6("Simulate the release of drug from a solid cylinder of 
-     #                 polymer into water"), 
-     #              sliderInput("releaseTime", h4("Duration of Release, hours"), 
-     #                          min = 100, max = 1000, value = 350)
-     #            ), 
-     #            column(6)
-     #          ))
+              )), 
+     tabPanel("Release",
+              fluidRow(
+                column(
+                  2, offset = 2,
+                  h6("Simulate the release of drug from a solid cylinder of
+                     polymer into water"),
+                  sliderInput("releaseTime", h4("Duration of Release, hours"),
+                              min = 100, max = 1000, value = 350), 
+                  textInput("releaseAff", h4("Calculated Affinity, dG in kJ/mol"))
+                ),
+                column(6)
+              ))
    )
 )
 
