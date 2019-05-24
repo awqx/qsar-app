@@ -31,6 +31,7 @@ library("caret")
 library("Cubist")
 library("data.table")
 library("devtools")
+library("DT")
 library("e1071")
 library("earth")
 library("extrafont")
@@ -40,6 +41,8 @@ library("kernlab")
 library("randomForest")
 library("rcdk")
 library("RCurl")
+library("ReacTran")
+library("rlang")
 library("stringr")
 library("tidyverse")
 library("tools")
@@ -51,7 +54,8 @@ library("slickR")
 library("tools")
 library("rsconnect")
 
-loadfonts()
+# loadfonts()
+
 # Variables =====
 
 # Alpha-CD
@@ -534,47 +538,108 @@ plot.smiles <- function(guest) {
 
 # Sourced from Edgardo Rivera-Delgado (ERD) from 
 # https://github.com/eriveradelgado/ODE_Practice
-affinity <- function(t, state, parms, ...) {
-  with(as.list(c(state, parms)), {
+# affinity <- function(t, state, ...) {
+#     # extracting states
+#     ligand  <- state[1:nstep]
+#     complex <- state[(nstep+1):(2*nstep)]
+#     media <- state[2*nstep + 1]
+#     
+#     # initializing partial derivatives
+#     dligand  <- rep(0, nstep)
+#     dcomplex <- rep(0, nstep)
+#     dmedia   <- 0
+#     rb       <- rep(0, nstep)
+#     
+#     # MOL
+#       # Binding of ligand to host
+#     for(i in 1:(nstep - 1)) {
+#       rb[i] <- p1 * ligand[i] * (p3 - complex[i]) - complex[i]
+#     }
+#     
+#      # Diffusion of ligand through media
+#     dligand[1] <- p2 * (ligand[2] - ligand[1]) / (delta^2 )- rb[1]
+#     
+#       # polymer-media interface
+#     dligand[nstep-1] <- p2 * (-2*ligand[nstep-1] + ligand[nstep-2]) / (delta^2)- rb[nstep-1]
+#     
+#       # layers between the interface and the center
+#     for(i in 2:(nstep-2)) {
+#       dligand[i] <- 
+#         p2 * (ligand[i+1] - 2*ligand[i] + ligand[i-1]) / (delta^2)- rb[i]
+#       
+#         # Change in [complex] through polymer
+#       dcomplex <- rb
+#         
+#         # media: amount of ligand exiting into media
+#       dmedia <- -p2 * (ligand[nstep] - ligand[nstep-1]) / (delta^2)
+#       dudt <- c(dligand, dcomplex, dmedia)
+#       
+#       ncall <<- ncall + 1
+#       
+#       return(list(dudt))
+#     
+#   }
+# }
+
+# assuming dG is in kj/mol
+dg.to.ka <- function(dg) {
+  # exp(n) = e^n
+  joules <- dg * 1000
+  return (exp(joules / (-8.314 * 298)))
+}
+
+affinity <- function(t, state , ...){
+  
+    # LIGAND + host <-> COMPLEX (LIGAND:host)
     
-    # extracting states
-    ligand  <- state[1:n]
-    complex <- state[(n+1):(2*n)]
-    release <- state[2*n + 1]
+    # The LIGAND is free to diffuse along the vertical length (N) of the polymer 
+    # cylinder. The host remains constant as it is part of the polymer cylinder 
+    # matrix. The LIGAND can reversibly bind to the the host to form a COMPLEX. 
+    # Only the free LIGAND diffuses into the liquid media and is called the RELEASE.
     
-    # initializing partial derivatives
-    dligand  <- rep(0, N)
-    dcomplex <- rep(0, N)
-    drelease <- 0
-    rb       <- rep(0, N)
     
-    # MOL
-      # Binding of ligand to host
-    for(i in 1:(n - 1)) {
-      rb[i] <- p1 * ligand[i] * (p3 - complex[i]) - complex[i]
+    # Extracting values passed into the function through the state argument
+    LIGAND     <- state[1:N]
+    COMPLEX    <- state[(N+1):(2*N)]
+    RELEASE    <- state[2*N+1]
+    
+    # Initializing the derivatives vectors
+    dLIGAND    <- rep(0, times = N)
+    dCOMPLEX   <- rep(0, times = N)
+    dRELEASE   <- 0
+    Rb         <- rep(0, times = N)
+    
+    # Method of Lines  
+    ## Binding process to host
+    for(i in 1:(N-1)){
+      Rb[i]        <- p1 * LIGAND[i] * (p3 - COMPLEX[i]) - COMPLEX[i] 
+    }
+    ## Diffusion process of the ligand 
+    
+    dLIGAND[1]   <- p2 * (LIGAND[2] - LIGAND[1]) / (delta^2) - Rb[1]
+    
+    ## This layer represents the polymer cylinder to liquid media interface
+    
+    dLIGAND[N-1] <- p2 * (-2 * LIGAND[N-1] + LIGAND[N-2]) / (delta^2) - Rb[N-1]
+    
+    ## These are the calculations for the layers in between top and center
+    
+    for(i in 2:(N-2)){
+      dLIGAND[i]   <- 
+        p2 * (LIGAND[i + 1] - 2 * LIGAND[i] + LIGAND[i-1]) / (delta^2) - Rb[i]
     }
     
-     # Diffusion of ligand through media
-    dligand[1] <- p2 * (ligand[2] - ligand[1]) / delta^2 - rb[1]
+    ## Change in COMPLEX through the polymer cylinder
     
-      # polymer-media interface
-    dligand[n-1] <- p2 * (-2*ligand[n-1] + ligand[n-2] / delta^2 - rb[n-1])
+    dCOMPLEX     <- Rb
     
-      # layers between the interface and the center
-    for(i in 2:(n-2)) {
-      dligand[i] <- 
-        p2 * (ligand[i+1] - 2*ligand[i] + ligand[i-1] / delta^2 - rb[i])
-      
-        # Change in [complex] through polymer
-      dcomplex <- rb
-        
-        # release: amount of ligand exiting into media
-      drelease <- -p2 * (ligand[n] - ligand[n - 1]) / delta^2
-      dudt <- c(dligand, dcomplex, drelease)
-      
-      ncal <<- ncall + 1
-      
-      return(list(dudt))
-    }
-  })
+    ## LIGAND exiting into the liquid environment
+    dRELEASE     <- -  p2 * (LIGAND[N] - LIGAND[(N-1)]) / (delta^2) 
+    
+    dudt         <- c(dLIGAND, dCOMPLEX, dRELEASE)
+    
+    ncall <<- ncall + 1 
+    
+    return(list(dudt)) 
+   
 }
