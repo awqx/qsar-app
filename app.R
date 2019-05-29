@@ -7,6 +7,7 @@ source("./functions.R")
 ui <- fluidPage(
    theme = shinytheme("sandstone"),
    tags$head(includeCSS("www/CSS.css")),
+   
 
    # tags$head(tags$style(".shiny-plot-output{height:100vh !important;}")),
    # Style ====
@@ -139,46 +140,47 @@ ui <- fluidPage(
        )
      ),
      # Download from CIR ----
-     tabPanel("Download", 
-              fluidRow(
-                
-                # A sidebar containing the searchbar for Cactus as well as an 
-                # option to download the generated .SDF
-                column(
-                  2, offset = 2, 
-                  textInput("search", 
-                            label = h4("Chemical Identifier Resolver")),
-                  h6("Add multiple chemical names by separating names with a comma"),
-                  actionButton("searchButton", "Search"),
-                  br(), 
-                  br(),
-                  downloadButton('downloadData', 'Download')
-                  
-                ), 
-                # The main panel. Contains the results of the CIR search and
-                # a panel containining plots of the molecular structures.
-                column(
-                  6, 
-                  tabsetPanel(
-                    tabPanel(
-                      "Results", 
-                      DT::dataTableOutput("SDFTable")
-                    ),
-                    tabPanel(
-                      "Molecules", 
-                      # slickROutput("molecules")
-                      plotOutput("molecules", width = "100%"), 
-                      fluidRow(
-                        column(1, offset = 4, actionButton("prev", "PREV")), 
-                        column(2, offset = 0.5, textOutput("pageCount")), 
-                        column(1, offset = 0.5, actionButton("next", "NEXT")), 
-                        tags$style(type='text/css', "#pageCount { text-align: center; font-size: 16px}")
-                      )
-                    )
+     tabPanel(
+       "Download", 
+          fluidRow(
+            
+            # A sidebar containing the searchbar for Cactus as well as an 
+            # option to download the generated .SDF
+            column(
+              2, offset = 2, 
+              textInput("search", 
+                        label = h4("Chemical Identifier Resolver")),
+              h6("Add multiple chemical names by separating names with a comma"),
+              actionButton("searchButton", "Search"),
+              br(), 
+              br(),
+              downloadButton('downloadData', 'Download')
+              
+            ), 
+            # The main panel. Contains the results of the CIR search and
+            # a panel containining plots of the molecular structures.
+            column(
+              6, 
+              tabsetPanel(
+                tabPanel(
+                  "Results", 
+                  DT::dataTableOutput("SDFTable")
+                ),
+                tabPanel(
+                  "Molecules", 
+                  # slickROutput("molecules")
+                  plotOutput("molecules", width = "100%"), 
+                  fluidRow(
+                    column(1, offset = 4, actionButton("prev", "PREV")), 
+                    column(2, offset = 0.5, textOutput("pageCount")), 
+                    column(1, offset = 0.5, actionButton("next", "NEXT")), 
+                    tags$style(type='text/css', "#pageCount { text-align: center; font-size: 16px}")
                   )
                 )
               )
-              ), 
+            )
+          )
+          ), 
      # Upload and run QSAR ----
      tabPanel(
        "Upload", 
@@ -219,7 +221,13 @@ ui <- fluidPage(
            6,
            tabsetPanel(
              tabPanel("Table", DT::dataTableOutput("predTable")),
-             tabPanel("Plot", plotOutput("predPlot")) 
+             tabPanel("Plot", 
+                      div(
+                        style = "position:relative", 
+                        plotOutput("predPlot",  
+                                   hover = hoverOpts(id = "predHover")), 
+                        uiOutput("predInfo")) 
+             ) 
            )
          )
       )),
@@ -249,31 +257,43 @@ ui <- fluidPage(
                                style = "position:relative", 
                                plotOutput("explorePlot",  
                                           hover = hoverOpts(id = "exploreHover")), 
-                               uiOutput("hoverInfo")) 
+                               uiOutput("exploreInfo")) 
                              )
                              
                              #          , 
-                             # verbatimTextOutput("hoverInfo")) 
+                             # verbatimTextOutput("exploreInfo")) 
                   )
                 )
-              )) #, 
-     # tabPanel("Release", 
-     #          fluidRow(
-     #            column(
-     #              2, offset = 2, 
-     #              h6("Simulate the release of drug from a solid cylinder of 
-     #                 polymer into water"), 
-     #              sliderInput("releaseTime", h4("Duration of Release, hours"), 
-     #                          min = 100, max = 1000, value = 350)
-     #            ), 
-     #            column(6)
-     #          ))
+              )), 
+     tabPanel("Release",
+              fluidRow(
+                column(
+                  2, offset = 2,
+                  h6("Simulate the release of drug from a solid cylinder of
+                     polymer into water"),
+                  sliderInput("releaseTime", h4("Duration of Release, hours"),
+                              min = 100, max = 1000, value = 350), 
+                  numericInput("releaseAff", h4("Calculated Affinity, dG in kJ/mol"), 
+                               value = -10), 
+                  actionButton("runODE", "Simulate Release")
+                ),
+                column(
+                  6,
+                  tabsetPanel(
+                    tabPanel("Table", DT::dataTableOutput("releaseTable")),
+                    tabPanel("Plot", plotOutput("releasePlot"))
+                  )
+              )
+              ))
    )
 )
 
 # Server =====
 
 server <- function(input, output) {
+  
+  options(DT.fillContainer = FALSE) 
+  options(DT.autoHideNavigation = FALSE) 
   
   # QSAR ----
   # A slider for adjusting the x-axis depending on the variable
@@ -285,7 +305,7 @@ server <- function(input, output) {
     else
       xrange <- choose.x()[ , 2] %>% range() %>% round()
     
-    sliderInput("xrange", "Range of x-axis", 
+    sliderInput("xrange", h4("Range of x-axis"), 
                 min = xrange[1], max = xrange[2], xrange)
   })
   
@@ -301,7 +321,7 @@ server <- function(input, output) {
     else
       read.csv(input$padel$datapath, header = T) %>%
         rename(guest = Name) %>%
-        select(., guest,!!input$xaxis)
+        select(., guest,!!input$xaxis) 
     
   })
 
@@ -385,11 +405,24 @@ server <- function(input, output) {
   output$predTable <- DT::renderDataTable({
     if(is.null(pred()))
       return()
-    pred() %>% 
-      full_join(., choose.x(), by = "guest") %>%
-      rename(Guest = guest, `Binding, kJ/mol` = ensemble, 
-             `Applicability` = domain) %>%
-      select(., -newSk)
+    
+    ptable <- full_join(pred(), choose.x(), by = "guest")
+    ptable <- ptable %>% 
+      dplyr::filter(ensemble >= input$yrange[1] & ensemble <= input$yrange[2])
+    
+    if(input$xaxis == "ad") {
+      ptable %>%
+        filter(newSk >= input$xrange[1] & newSk <= input$xrange[2]) %>% 
+        mutate(newSk = round(newSk, 2)) %>%
+        rename(Guest = guest, `Binding, kJ/mol` = ensemble, 
+               `Applicability` = domain) 
+    } else {
+      ptable[ , 6] <- round(ptable[ , 6])
+      ptable[ptable[ , 6] >= input$xrange[1] & ptable[ , 6] <= input$xrange[2], ] %>% 
+        mutate(newSk = round(newSk, 2)) %>%
+        rename(Guest = guest, `Binding, kJ/mol` = ensemble, 
+               `Applicability` = domain) 
+    }
   })
   
   output$downloadPred <- downloadHandler(
@@ -417,14 +450,59 @@ server <- function(input, output) {
     }
   )
   
+  # Credit to Pawel, https://gitlab.com/snippets/16220
+  output$predInfo <- renderUI({
+    
+    ptable <- full_join(pred(), choose.x(), by = "guest")
+    hover <- input$predHover
+    point <- nearPoints(ptable, hover, threshold = 5,
+                        maxpoints = 1, addDist = T)
+    if(nrow(point) == 0) # no plot exists
+      return(NULL)
+    
+    # Calculate point position inside the image as percent of dimensions
+    left.pct <- (hover$x - hover$domain$left) / (hover$domain$right - hover$domain$left)
+    top.pct <- (hover$domain$top - hover$y) / (hover$domain$top - hover$domain$bottom)
+    
+    # Calculate distance in pixels
+    left.px <- hover$range$left + left.pct * (hover$range$right - hover$range$left)
+    top.px <- hover$range$top + top.pct * (hover$range$bottom - hover$range$top)
+    
+    # Style the tooltip
+    style <- paste0("position:absolute; z-index:100; ", 
+                    "background-color: rgba(245, 245, 245, 0.85); ",
+                    "left:", left.px + 2, "px; top:", top.px + 2, "px;")
+    
+    # Create tooltip as wellPanel
+    wellPanel(
+      style = style, 
+      p(HTML(paste0(
+        "<b>Guest: </b>", toTitleCase(point$guest), "<br/>",
+        "<b>Affinity: </b>", round(point$ensemble, 1), "kJ/mol <br/>", 
+        "<b>Host: </b>", point$CD, "<br/>", 
+        "<b>Applicability: </b>", ifelse(point$newSk < 3, "Inside", "Outside")
+      )))
+    )
+    
+  })
+  
   # SDF/CIR ----
+  
+  # Linking the action button to generating a string of guests
+  # This fixes the problem where typing into the search box causes the 
+  # table to update without querying CIR
+  
+  guest <- eventReactive(
+    input$searchButton, 
+    input$search
+  )
   
   # An SDF in the form of a data.frame
   # Unfortunately, I cannot handle molecules with commas in their name 
   # because of how I'm splitting the search bar.
   SDFile <- eventReactive(
     input$searchButton, {
-      download.cactus.multiple(input$search)
+      download.cactus.multiple(guest())
     }, ignoreNULL = T
   )
   
@@ -432,10 +510,10 @@ server <- function(input, output) {
   output$SDFTable <- DT::renderDataTable({
     if(is.null(SDFile()))
       return(NULL)
-    check.found <- isolate(check.sdf(SDFile(), input$search)) 
+    check.found <- check.sdf(SDFile(), guest())
     # Finding names of guests
     guest.names <- 
-      strsplit(input$search, ",") %>% 
+      strsplit(guest(), ",") %>% 
       lapply(str_trim) %>% unlist() %>% 
       toTitleCase()
     # Creating a data frame
@@ -545,7 +623,7 @@ server <- function(input, output) {
     
   })
   # Credit to Pawel, https://gitlab.com/snippets/16220
-  output$hoverInfo <- renderUI({
+  output$exploreInfo <- renderUI({
     
     hover <- input$exploreHover
     point <- nearPoints(explore.sort(), hover, threshold = 5, 
@@ -578,10 +656,195 @@ server <- function(input, output) {
     )
     
   })
-}
+  # Release ----
+  ode.output <- eventReactive(input$runODE, {
+    time  <-   input$releaseTime        # Length of simulation in hrs
+    
+    M_l   <-     0.0004      # Initial drug in polymer cylinder in millimoles.
+    V_h   <-     0.0785      # Volume of polymer cylinder mL
+    
+    # k2    <-    36.9         # LIGAND decoupling rate from host in 1/hrs
+    # k1    <-   303.7 * 1000 * 36.9 # LIGAND coupling rate to host in 1/mM*hrs
+    # K     <-   k1 / k2       # Binding strength between drug and host in mM^-1
+    K <- dg.to.ka(input$releaseAff)
+    k2 <<- 36.9
+    k1 <- k2*K
+    
+    N     <<-    50.0         # Number of boxes 
+    delta <<-    1 / N        # Spacing 
+    
+    C_o   <- M_l / V_h       # LIGAND in polymer cylinder in mM
+    C_T   <- 0.00881 / V_h   # Host concentration in polymer cylinder in mM 
+    C_c   <- 0.00001 * C_T   # Fraction of hosts without bound drug
+    
+    ## Equilibrium concentrations
+    
+    ### LIGAND  + COMPLEX (LIGAND:host) <- C_o <- Total LIGAND in polymer cylinder
+    ligand_eq  <-       (C_o) / (1 + K * C_c) # Free LIGAND at time = 0 in mM
+    complex_eq <- C_o - (C_o) / (1 + K * C_c) # COMPLEX at time = 0  in mM
+    
+    ## Dimensionless parameters
+    ligand_init  <-  ligand_eq / C_o  # Dimensionless free LIGAND
+    complex_init <- complex_eq / C_o  # Dimensionless COMPLEX
+    tau          <-       time * k2   # Dimensionless time
+    times <- seq(0, tau, by = 1)
+    
+    p1 <<- k1 * C_o / k2
+    p2 <<- 0.933
+    p3 <<- C_T / C_o
+    
+    # State variables 
+    
+    ### Free LIGAND divided into the total number of layers with the layer in direct 
+    ### contact to the liquid media set to 0
+    
+    LIGAND    <- c(rep((ligand_init / (N-1)), times = N-1), 0)  
+    
+    ### COMPLEX divided into the total number of layers
+    
+    COMPLEX   <- rep((complex_init / N), times = N)   
+    
+    ### Initially there's no drug in the liquid environment
+    
+    RELEASE   <- 0  
+    state  <- c(LIGAND = LIGAND,
+                COMPLEX = COMPLEX,
+                RELEASE = RELEASE)
+    ncall <<- 0
+    
+    ode(y = state, 
+        times = times, 
+        func = affinity)
+    
+  })
 
+  release.tidy <- reactive({
+    
+    if(is.null(ode.output()))
+      return()
+    tidy_release_polymer  <- as.data.frame(ode.output()) %>% 
+      select(-RELEASE) %>%
+      gather(., key = "species", value = "concentration", -time) %>%
+      separate(col = species, 
+               into = c("species", "z"), 
+               sep = "(?<=[:alpha:])(?=[:digit:])") %>% # Separating the state 
+      # variable names from the
+      # vertical coordinates of 
+      # the polymer cylinder
+      mutate(z = as.numeric(z)) %>%
+      mutate(time = time / k2) %>% # Reverting back time from dimensionless to hrs
+      filter(species %in% c("LIGAND", "COMPLEX")) %>% # 
+      group_by(time) %>% 
+      summarise(ligand_in_polymer = sum(concentration)) 
+    
+    # Grabbing the RELEASE variable. I expect it to go up to 1.
+    
+    tidy_release_media <- ode.output() %>%
+      as.data.frame() %>%
+      select(time, RELEASE) %>%
+      mutate(time = time / k2) %>%
+      rename(ligand_in_media = RELEASE) 
+    
+    # When I sum both the drug remaining in the polymer cylinder and the drug 
+    # entering the solution I expect a flat line around 1 (+/- numerical error) due 
+    # to the principle of mass conservation. However, I obtain a depletion curve.
+    
+    tidy_release_df<- tidy_release_polymer %>%
+      inner_join(tidy_release_media, by = "time")  %>%
+      mutate(mass_conservation = ligand_in_polymer + ligand_in_media) 
+    return(tidy_release_df)
+    
+  }
+  )
+
+# a table where only times in 10 hour increments are shown
+  release.info <- reactive({
+    if(is.null(ode.output()))
+      return()
+    # # Using 10% polymer, 20% polymer, ... released
+    # # Benchmarks for amount of polymer released
+    # release.amt <- seq(0, 1, by = 0.10)
+    # reached <- lapply(release.amt, 
+    #                      function(x) 
+    #                        which.min(abs(
+    #                          release.tidy()$ligand_in_media - x))) %>%
+    #   unlist()
+    # release.tidy()[reached, ]
+    
+    # Simply dividing into 10 hour increments
+    timepoints <- seq(0, input$releaseTime, by = 10)
+    times.index <- lapply(
+      timepoints, function(x)
+        which.min(abs(release.tidy()$time - x))) %>%
+      unlist()
+    release.tidy()[times.index, ] %>%
+      select(time, ligand_in_media) %>%
+      mutate(ligand_in_media = round(ligand_in_media, 3)) %>%
+      rename(`Time, in hrs` = time, 
+             `Proportion of Cumulative Release` = ligand_in_media)
+  
+  })
+  
+  output$releaseTable <- DT::renderDataTable(
+    # head(ode.output())
+    release.info()
+
+  )
+  
+  output$releasePlot <- renderPlot(
+    release.tidy() %>%
+      ggplot(aes(time, ligand_in_media)) + 
+      geom_point() + 
+      theme_bw()
+  )
+  
+}
 
 # Run =====
 # Run the application 
 shinyApp(ui = ui, server = server)
 
+# ode.output <- eventReactive(input$runODE, {
+#   t <- input$releaseTime
+#   ka <- dg.to.ka(input$releaseAff)
+# 
+#   k1 <- 36.9*ka
+#   k2 <<- 36.9 # experimentally determined by Fu
+#   k1 <- 12.6 * 1000 * 26.7
+#   k2 <<- 26.7
+#   
+#   drug <- 0.0004 # initial drug amount in mM
+#   vol <- 0.0785 # volume of polymer (in L?)
+#   
+#   nstep <- 40.0 # number of steps in ODE
+#   delta <- 1/nstep # spacing between steps
+#   
+#   c.drug <- drug/vol # [drug] in polymer cylinder, mM/L
+#   c.cd <- 0.00881/vol # [cd] total in mM/L
+#   c.empty <- 0.00001*c.cd # [unbound cd] in mM/L
+#   
+#   # Equilibrium conditions
+#   c.drug.eq <- c.drug/(1 + k1/k2 * c.empty) # [drug] @ eq
+#   c.comp.eq <- c.drug - c.drug.eq/(1 + k1/k2*c.empty) # [complex] @ eq
+# 
+#   # Dimensionless parameters 
+#   # (no "c." prefix because the units cancel)
+#   drug.init <- c.drug.eq/c.drug # [drug] initially
+#   comp.init <- c.comp.eq/c.drug # [complex] initially
+#   tau <- t*k2
+#   
+#   ligand <- c(rep(drug.init/(nstep - 1), times = nstep - 1), 0)
+#   complex <- rep(comp.init/nstep, times = nstep)
+#   media <- 0 # no drug in media
+#   
+#   # initializing the state, parameters, and tau
+#   state <- c(ligand = ligand, complex = complex, media = media)
+#   p1 <- ka*c.drug
+#   p2 <- 0.933
+#   p3 <- c.cd/c.drug
+#   
+#   t.tau <- seq(0, tau, by = 1)
+#   ncall <- 0
+#   ode(y = state, times = t.tau, func = affinity)
+# }
+# )
