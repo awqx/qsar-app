@@ -277,8 +277,13 @@ ui <- fluidPage(
                                value = -10), 
                   actionButton("runODE", "Simulate Release")
                 ),
-                column(6, 
-                       DT::dataTableOutput("releaseTable"))
+                column(
+                  6,
+                  tabsetPanel(
+                    tabPanel("Table", DT::dataTableOutput("releaseTable")),
+                    tabPanel("Plot", plotOutput("releasePlot"))
+                  )
+              )
               ))
    )
 )
@@ -653,7 +658,7 @@ server <- function(input, output) {
   })
   # Release ----
   ode.output <- eventReactive(input$runODE, {
-    time  <-   350.0         # Length of simulation in hrs
+    time  <-   input$releaseTime        # Length of simulation in hrs
     
     M_l   <-     0.0004      # Initial drug in polymer cylinder in millimoles.
     V_h   <-     0.0785      # Volume of polymer cylinder mL
@@ -662,11 +667,11 @@ server <- function(input, output) {
     # k1    <-   303.7 * 1000 * 36.9 # LIGAND coupling rate to host in 1/mM*hrs
     # K     <-   k1 / k2       # Binding strength between drug and host in mM^-1
     K <- dg.to.ka(input$releaseAff)
-    k2 <- 36.9
+    k2 <<- 36.9
     k1 <- k2*K
     
-    N     <-    50.0         # Number of boxes 
-    delta <-    1 / N        # Spacing 
+    N     <<-    50.0         # Number of boxes 
+    delta <<-    1 / N        # Spacing 
     
     C_o   <- M_l / V_h       # LIGAND in polymer cylinder in mM
     C_T   <- 0.00881 / V_h   # Host concentration in polymer cylinder in mM 
@@ -682,6 +687,11 @@ server <- function(input, output) {
     ligand_init  <-  ligand_eq / C_o  # Dimensionless free LIGAND
     complex_init <- complex_eq / C_o  # Dimensionless COMPLEX
     tau          <-       time * k2   # Dimensionless time
+    times <- seq(0, tau, by = 1)
+    
+    p1 <<- k1 * C_o / k2
+    p2 <<- 0.933
+    p3 <<- C_T / C_o
     
     # State variables 
     
@@ -700,57 +710,13 @@ server <- function(input, output) {
     state  <- c(LIGAND = LIGAND,
                 COMPLEX = COMPLEX,
                 RELEASE = RELEASE)
-    ncall <- 0
+    ncall <<- 0
     
     ode(y = state, 
         times = times, 
         func = affinity)
     
   })
-  # ode.output <- eventReactive(input$runODE, {
-  #   t <- input$releaseTime
-  #   ka <- dg.to.ka(input$releaseAff)
-  # 
-  #   k1 <- 36.9*ka
-  #   k2 <<- 36.9 # experimentally determined by Fu
-  #   k1 <- 12.6 * 1000 * 26.7
-  #   k2 <<- 26.7
-  #   
-  #   drug <- 0.0004 # initial drug amount in mM
-  #   vol <- 0.0785 # volume of polymer (in L?)
-  #   
-  #   nstep <- 40.0 # number of steps in ODE
-  #   delta <- 1/nstep # spacing between steps
-  #   
-  #   c.drug <- drug/vol # [drug] in polymer cylinder, mM/L
-  #   c.cd <- 0.00881/vol # [cd] total in mM/L
-  #   c.empty <- 0.00001*c.cd # [unbound cd] in mM/L
-  #   
-  #   # Equilibrium conditions
-  #   c.drug.eq <- c.drug/(1 + k1/k2 * c.empty) # [drug] @ eq
-  #   c.comp.eq <- c.drug - c.drug.eq/(1 + k1/k2*c.empty) # [complex] @ eq
-  # 
-  #   # Dimensionless parameters 
-  #   # (no "c." prefix because the units cancel)
-  #   drug.init <- c.drug.eq/c.drug # [drug] initially
-  #   comp.init <- c.comp.eq/c.drug # [complex] initially
-  #   tau <- t*k2
-  #   
-  #   ligand <- c(rep(drug.init/(nstep - 1), times = nstep - 1), 0)
-  #   complex <- rep(comp.init/nstep, times = nstep)
-  #   media <- 0 # no drug in media
-  #   
-  #   # initializing the state, parameters, and tau
-  #   state <- c(ligand = ligand, complex = complex, media = media)
-  #   p1 <- ka*c.drug
-  #   p2 <- 0.933
-  #   p3 <- c.cd/c.drug
-  #   
-  #   t.tau <- seq(0, tau, by = 1)
-  #   ncall <- 0
-  #   ode(y = state, times = t.tau, func = affinity)
-  # }
-  # )
 
   release.tidy <- reactive({
     
@@ -790,10 +756,46 @@ server <- function(input, output) {
     
   }
   )
+
+# a table where only times in 10 hour increments are shown
+  release.info <- reactive({
+    if(is.null(ode.output()))
+      return()
+    # # Using 10% polymer, 20% polymer, ... released
+    # # Benchmarks for amount of polymer released
+    # release.amt <- seq(0, 1, by = 0.10)
+    # reached <- lapply(release.amt, 
+    #                      function(x) 
+    #                        which.min(abs(
+    #                          release.tidy()$ligand_in_media - x))) %>%
+    #   unlist()
+    # release.tidy()[reached, ]
+    
+    # Simply dividing into 10 hour increments
+    timepoints <- seq(0, input$releaseTime, by = 10)
+    times.index <- lapply(
+      timepoints, function(x)
+        which.min(abs(release.tidy()$time - x))) %>%
+      unlist()
+    release.tidy()[times.index, ] %>%
+      select(time, ligand_in_media) %>%
+      mutate(ligand_in_media = round(ligand_in_media, 3)) %>%
+      rename(`Time, in hrs` = time, 
+             `Proportion of Cumulative Release` = ligand_in_media)
+  
+  })
   
   output$releaseTable <- DT::renderDataTable(
     # head(ode.output())
-    release.tidy()
+    release.info()
+
+  )
+  
+  output$releasePlot <- renderPlot(
+    release.tidy() %>%
+      ggplot(aes(time, ligand_in_media)) + 
+      geom_point() + 
+      theme_bw()
   )
   
 }
@@ -802,3 +804,47 @@ server <- function(input, output) {
 # Run the application 
 shinyApp(ui = ui, server = server)
 
+# ode.output <- eventReactive(input$runODE, {
+#   t <- input$releaseTime
+#   ka <- dg.to.ka(input$releaseAff)
+# 
+#   k1 <- 36.9*ka
+#   k2 <<- 36.9 # experimentally determined by Fu
+#   k1 <- 12.6 * 1000 * 26.7
+#   k2 <<- 26.7
+#   
+#   drug <- 0.0004 # initial drug amount in mM
+#   vol <- 0.0785 # volume of polymer (in L?)
+#   
+#   nstep <- 40.0 # number of steps in ODE
+#   delta <- 1/nstep # spacing between steps
+#   
+#   c.drug <- drug/vol # [drug] in polymer cylinder, mM/L
+#   c.cd <- 0.00881/vol # [cd] total in mM/L
+#   c.empty <- 0.00001*c.cd # [unbound cd] in mM/L
+#   
+#   # Equilibrium conditions
+#   c.drug.eq <- c.drug/(1 + k1/k2 * c.empty) # [drug] @ eq
+#   c.comp.eq <- c.drug - c.drug.eq/(1 + k1/k2*c.empty) # [complex] @ eq
+# 
+#   # Dimensionless parameters 
+#   # (no "c." prefix because the units cancel)
+#   drug.init <- c.drug.eq/c.drug # [drug] initially
+#   comp.init <- c.comp.eq/c.drug # [complex] initially
+#   tau <- t*k2
+#   
+#   ligand <- c(rep(drug.init/(nstep - 1), times = nstep - 1), 0)
+#   complex <- rep(comp.init/nstep, times = nstep)
+#   media <- 0 # no drug in media
+#   
+#   # initializing the state, parameters, and tau
+#   state <- c(ligand = ligand, complex = complex, media = media)
+#   p1 <- ka*c.drug
+#   p2 <- 0.933
+#   p3 <- c.cd/c.drug
+#   
+#   t.tau <- seq(0, tau, by = 1)
+#   ncall <- 0
+#   ode(y = state, times = t.tau, func = affinity)
+# }
+# )

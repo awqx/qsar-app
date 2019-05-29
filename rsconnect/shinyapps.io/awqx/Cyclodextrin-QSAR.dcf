@@ -5,8 +5,8 @@ account: awqx
 server: shinyapps.io
 hostUrl: https://api.shinyapps.io/v1
 appId: 832657
-bundleId: 2077337
+bundleId: 2090014
 url: https://awqx.shinyapps.io/Cyclodextrin-QSAR/
-when: 1557595608.62413
+when: 1558031226.11491
 asMultiple: FALSE
 asStatic: FALSE

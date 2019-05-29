@@ -538,48 +538,6 @@ plot.smiles <- function(guest) {
 
 # Sourced from Edgardo Rivera-Delgado (ERD) from 
 # https://github.com/eriveradelgado/ODE_Practice
-# affinity <- function(t, state, ...) {
-#     # extracting states
-#     ligand  <- state[1:nstep]
-#     complex <- state[(nstep+1):(2*nstep)]
-#     media <- state[2*nstep + 1]
-#     
-#     # initializing partial derivatives
-#     dligand  <- rep(0, nstep)
-#     dcomplex <- rep(0, nstep)
-#     dmedia   <- 0
-#     rb       <- rep(0, nstep)
-#     
-#     # MOL
-#       # Binding of ligand to host
-#     for(i in 1:(nstep - 1)) {
-#       rb[i] <- p1 * ligand[i] * (p3 - complex[i]) - complex[i]
-#     }
-#     
-#      # Diffusion of ligand through media
-#     dligand[1] <- p2 * (ligand[2] - ligand[1]) / (delta^2 )- rb[1]
-#     
-#       # polymer-media interface
-#     dligand[nstep-1] <- p2 * (-2*ligand[nstep-1] + ligand[nstep-2]) / (delta^2)- rb[nstep-1]
-#     
-#       # layers between the interface and the center
-#     for(i in 2:(nstep-2)) {
-#       dligand[i] <- 
-#         p2 * (ligand[i+1] - 2*ligand[i] + ligand[i-1]) / (delta^2)- rb[i]
-#       
-#         # Change in [complex] through polymer
-#       dcomplex <- rb
-#         
-#         # media: amount of ligand exiting into media
-#       dmedia <- -p2 * (ligand[nstep] - ligand[nstep-1]) / (delta^2)
-#       dudt <- c(dligand, dcomplex, dmedia)
-#       
-#       ncall <<- ncall + 1
-#       
-#       return(list(dudt))
-#     
-#   }
-# }
 
 # assuming dG is in kj/mol
 dg.to.ka <- function(dg) {
@@ -643,3 +601,46 @@ affinity <- function(t, state , ...){
     return(list(dudt)) 
    
 }
+
+# affinity <- function(t, state, ...) {
+#     # extracting states
+#     ligand  <- state[1:nstep]
+#     complex <- state[(nstep+1):(2*nstep)]
+#     media <- state[2*nstep + 1]
+#     
+#     # initializing partial derivatives
+#     dligand  <- rep(0, nstep)
+#     dcomplex <- rep(0, nstep)
+#     dmedia   <- 0
+#     rb       <- rep(0, nstep)
+#     
+#     # MOL
+#       # Binding of ligand to host
+#     for(i in 1:(nstep - 1)) {
+#       rb[i] <- p1 * ligand[i] * (p3 - complex[i]) - complex[i]
+#     }
+#     
+#      # Diffusion of ligand through media
+#     dligand[1] <- p2 * (ligand[2] - ligand[1]) / (delta^2 )- rb[1]
+#     
+#       # polymer-media interface
+#     dligand[nstep-1] <- p2 * (-2*ligand[nstep-1] + ligand[nstep-2]) / (delta^2)- rb[nstep-1]
+#     
+#       # layers between the interface and the center
+#     for(i in 2:(nstep-2)) {
+#       dligand[i] <- 
+#         p2 * (ligand[i+1] - 2*ligand[i] + ligand[i-1]) / (delta^2)- rb[i]
+#       
+#         # Change in [complex] through polymer
+#       dcomplex <- rb
+#         
+#         # media: amount of ligand exiting into media
+#       dmedia <- -p2 * (ligand[nstep] - ligand[nstep-1]) / (delta^2)
+#       dudt <- c(dligand, dcomplex, dmedia)
+#       
+#       ncall <<- ncall + 1
+#       
+#       return(list(dudt))
+#     
+#   }
+# }
