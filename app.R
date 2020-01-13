@@ -6,29 +6,7 @@ source("./functions.R")
 # Define UI for application that draws a histogram
 ui <- fluidPage(
    theme = shinytheme("sandstone"),
-   tags$head(includeCSS("www/CSS.css")),
-   
-
-   # tags$head(tags$style(".shiny-plot-output{height:100vh !important;}")),
-   # Style ====
-   #' tags$head(
-   #'   tags$style(
-   #'     HTML("
-   #'      @import url('https://fonts.googleapis.com/css?family=Open+Sans');
-   #'      @import url('https://fonts.googleapis.com/css?family=Nanum+Gothic+Coding');
-   #' 
-   #'      p {
-   #'        font-family: 'Open Sans';    
-   #'      }
-   #'      
-   #'      h3 {
-   #'        font-family: 'Nanum Gothic Coding';
-   #'      }
-   #'  "))
-   #' ),
-   # End style ====
-   # Application title
-   # titlePanel("Cyclodextrin Affinity Prediction"),
+   tags$head(includeCSS("www/CSS.css")),  
    
    navbarPage(
      theme = "yeti", 

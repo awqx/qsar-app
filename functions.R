@@ -10,23 +10,26 @@
 # BiocManager::repositories()
 # getOption("repos")
 
-# install.packages("caret")
-# install.packages("ChemmineR")
-# install.packages("Cubist")
-# install.packages("data.table")
-# install.packages("e1071")
-# install.packages("earth")
-# install.packages("gbm")
-# install.packages("glmnet")
-# install.packages("kernlab")
-# install.packages("randomForest")
-# install.packages("rcdk")
-# install.packages("RCurl")
-# install.packages("stringr")
-# install.packages("tidyverse")
-# install.packages("tools")
-# install.packages("xlsx")
-# install.packages("XML")
+if (!require("earth")) {
+  install.packages(
+    c(
+      "Cubist",
+      "e1071",
+      "earth",
+      "extrafont",
+      "gbm",
+      "glmnet",
+      "kernlab",
+      "rcdk",
+      "ReacTran",
+      "rsconnect",
+      "shinythemes",
+      "slickR",
+      "svglite",
+      "xlsx"
+    )
+  )
+}
 library("caret")
 library("Cubist")
 library("data.table")

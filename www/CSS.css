@@ -1,3 +1,4 @@
+/*
 @font-face {
   src: url(D-DIN.ttf);
   font-family: "D-DIN";
@@ -7,14 +8,20 @@
   src: url(AnkaCoder-C75-r.ttf);
   font-family: "Anka";
 }
+*/
+
+@import url('https://fonts.googleapis.com/css?family=Open+Sans');
 
 body {
-  font-family: "D-DIN", Helvetica, sans-serif;
+  /*font-family:"D-DIN", Helvetica,sans-serif; */
+  font-family: "Open Sans", Helvetica, sans-serif;
   font-size: 16px;
 }
 
+/*
 h3, 
 h4 {
-  font-family:"Anka", Helvetica,sans-serif; 
+  font-family:"", Helvetica, sans-serif; 
   text-transform: uppercase;
-}
+} 
+*/
