@@ -390,7 +390,7 @@ plot.smiles <- function(guest) {
       
       # Creating the base graph
       xmlSVG({
-        windowsFonts(A = windowsFont("D-DIN"))
+        # windowsFonts(A = windowsFont("D-DIN"))
         plot(1, type="n", xlab="", ylab="", 
              xlim=c(0, 10), ylim=c(0, 10), 
              axes = F)
@@ -459,7 +459,7 @@ plot.smiles <- function(guest) {
           head(length(selected.mol)) # so that names fit the molecules
         names(mol.page) <- pos
 
-          windowsFonts(A = windowsFont("D-DIN"))
+          # windowsFonts(A = windowsFont("D-DIN"))
           par(mai = c(0,0,0,0))
           plot(1, type="n", xlab="", ylab="",
                xlim=c(1, 9), ylim=c(1, 9), 
@@ -518,7 +518,7 @@ plot.smiles <- function(guest) {
         mol.page <- mol[selected.mol]
         # Saving the names
         mol.names <- names(mol.page)
-        windowsFonts(A = windowsFont("D-DIN"))
+        # windowsFonts(A = windowsFont("D-DIN"))
         par(mfrow = c(1, 3), mai = c(0, 0, 0, 0), 
             cex.main = 1.75)
         for(i in 1:length(mol.page)) {
