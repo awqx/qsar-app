@@ -4,8 +4,8 @@
 # picks up on the dependencies
 
 # ChemmineR requires a different installation
-# library("BiocManager")
-# BiocManager::install("ChemmineR")
+if (!require('BiocManager')) install.packages('BiocManager')
+BiocManager::install("ChemmineR")
 
 # BiocManager::repositories()
 # getOption("repos")
